@@ -56,8 +56,16 @@ void Display::begin() {
   Wire.begin(PIN_OLED_SDA, PIN_OLED_SCL);
   Wire.setClock(400000);
   // periphBegin=false: шина уже инициализирована на наших пинах выше
-  if (!_oled.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR, true, false)) {
-    _oled.begin(SSD1306_SWITCHCAPVCC, 0x3D, true, false);   // некоторые модули на 0x3D
+  bool ok = _oled.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR, true, false);
+  if (!ok) {
+    LOG_W("OLED", "addr 0x%02X not found, trying 0x3D", OLED_ADDR);
+    ok = _oled.begin(SSD1306_SWITCHCAPVCC, 0x3D, true, false);
+  }
+  if (!ok) {
+    LOG_E("OLED", "SSD1306 not found on I2C! check wiring to SDA=%d SCL=%d",
+          PIN_OLED_SDA, PIN_OLED_SCL);
+  } else {
+    LOG_I("OLED", "SSD1306 OK at 0x%02X", OLED_ADDR);
   }
   _oled.clearDisplay();
   _oled.display();
@@ -166,9 +174,11 @@ void Output::begin() {
   ledcSetup(BUZZER_CH, 1000, 8);
   ledcAttachPin(PIN_BUZZER, BUZZER_CH);
   ledcWrite(BUZZER_CH, 0);
+  LOG_I("BUZZ", "ledc ch=%d pin=%d", BUZZER_CH, PIN_BUZZER);
 
   pinMode(PIN_VIBRO, OUTPUT);
   digitalWrite(PIN_VIBRO, LOW);
+  LOG_I("VIBRO", "pin=%d", PIN_VIBRO);
 }
 
 void Output::update() {

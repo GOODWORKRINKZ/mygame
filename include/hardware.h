@@ -6,6 +6,7 @@
 #include <Adafruit_SSD1306.h>
 #include "config.h"
 #include "led_map.h"
+#include "log.h"
 
 // ============================================================
 //  Лента с логической адресацией (поверх LedMap)
