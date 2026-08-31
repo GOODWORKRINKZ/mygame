@@ -50,6 +50,27 @@ uint32_t LedStrip::hsv(uint16_t hue, uint8_t sat, uint8_t val) {
   return _strip.Color(r, g, b);
 }
 
+void LedStrip::colorTest() {
+  // Включаем по очереди: красный, зелёный, синий, белый, выкл.
+  // Если цвета перепутаны — увидишь по факту (R зажжётся зелёным и т.п.).
+  const uint32_t colors[] = {
+    rgb(255, 0, 0),    // RED
+    rgb(0, 255, 0),    // GREEN
+    rgb(0, 0, 255),    // BLUE
+    rgb(255, 255, 255) // WHITE
+  };
+  const char* names[] = { "RED", "GREEN", "BLUE", "WHITE" };
+  for (int c = 0; c < 4; c++) {
+    LOG_I("LED", "color test: %s on all %d pixels", names[c], LedMap::COUNT);
+    fillAll(colors[c]);
+    show();
+    delay(500);
+  }
+  fillAll(0);
+  show();
+  delay(200);
+}
+
 // ============================== Display ==============================
 
 void Display::begin() {

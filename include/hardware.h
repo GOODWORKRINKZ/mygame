@@ -24,6 +24,10 @@ public:
   void fillLogical(uint8_t from, uint8_t to, uint32_t color);
   void fillAll(uint32_t color);
 
+  // Диагностика: мигает всеми 32 светодиодами красным/зелёным/синим/белым
+  // по 500 мс каждый. Используется для проверки порядка цветов и питания.
+  void colorTest();
+
   uint32_t rgb(uint8_t r, uint8_t g, uint8_t b) { return _strip.Color(r, g, b); }
   uint32_t hsv(uint16_t hue, uint8_t sat = 255, uint8_t val = 255);
 

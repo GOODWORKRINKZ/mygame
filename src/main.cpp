@@ -34,6 +34,18 @@ void setup() {
   LOG_I("INIT", "leds.begin()...");
   leds.begin();
   LOG_I("INIT", "leds LUT built: %d logical -> physical", LED_COUNT);
+  LOG_I("INIT", "NeoPixel pin=%d brightness=%d/255 color order=GRB",
+         PIN_LED, LED_BRIGHTNESS);
+
+  // ====== ДИАГНОСТИКА ЛЕНТЫ =========================================
+  // Зажигаем все 32 пикселя по очереди: RED, GREEN, BLUE, WHITE.
+  // Если лента жива — увидишь последовательно 4 цвета по 500 мс каждый.
+  // Если нет — проверь: 1) питание 5V, 2) общий GND, 3) DATA на GPIO10,
+  // 4) резистор 330-470 Ом между GPIO10 и DIN, 5) яркость в config.h.
+  LOG_I("LED", "starting color test on strip...");
+  leds.colorTest();
+  LOG_I("LED", "color test done");
+  // ==================================================================
 
   LOG_I("INIT", "dpy.begin() (OLED 128x64 I2C 0x%02X)...", OLED_ADDR);
   dpy.begin();
