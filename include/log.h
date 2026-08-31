@@ -3,13 +3,18 @@
 
 // ============================================================
 //  Мини-логгер с уровнями и тегами. Пишет в Serial.
-//  На ESP32-C3 DevKitM-1 / SuperMini обычный Serial уже выходит
-//  по USB (UART0 подключён к встроенному USB-UART или USB-CDC мосту).
-//  Если у вас плата БЕЗ USB (чистый модуль), подключите UART0
-//  (GPIO20/21) к USB-TTL адаптеру и поправьте platformio.ini:
-//      build_flags = -DLOG_SERIAL=Serial0
-//      monitor_port = COM<номер>
+//  На ESP32-C3:
+//   * Без ARDUINO_USB_CDC_ON_BOOT: Serial = UART0 (GPIO20/21).
+//     Если у платы USB-UART мост (CH340/CP2102) — лог идёт в COM.
+//     Если у платы нативный USB (DevKitM-1/SuperMini) — пины пустые,
+//     лога не будет. В этом случае добавьте флаг ниже.
+//   * С ARDUINO_USB_CDC_ON_BOOT=1: Serial = USB-CDC (нужен
+//     дополнительный include HWCDC.h, чтобы компилятор видел Serial).
 // ============================================================
+
+#if ARDUINO_USB_CDC_ON_BOOT
+  #include <HWCDC.h>     // объявление extern HWCDC Serial в USB-CDC режиме
+#endif
 
 #ifndef LOG_SERIAL
   #define LOG_SERIAL Serial
