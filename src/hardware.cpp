@@ -107,6 +107,55 @@ void Display::gameFrame(const char* title, int s1, int s2,
   flush();
 }
 
+// Центрирует строку с учётом моноширинного шрифта Adafruit GFX:
+// ширина символа = 6 пикселей при size=1, 12 при size=2 и т.д.
+void Display::textCentered(int y, const char* s, uint8_t size) {
+  _oled.setTextSize(size);
+  uint16_t w = strlen(s) * 6 * size;
+  int16_t x = (OLED_WIDTH - (int)w) / 2;
+  if (x < 0) x = 0;
+  _oled.setCursor(x, y);
+  _oled.print(s);
+}
+
+void Display::bootFrame(uint8_t phase) {
+  _oled.clearDisplay();
+
+  if (phase == 0) {
+    // "Загрузка": бегущая полоска внизу
+    textCentered(8,  "LED ARCADE", 2);
+    _oled.setTextSize(1);
+    _oled.setCursor(0, 30);
+    _oled.print("32-pixel console");
+    _oled.drawRect(10, 48, OLED_WIDTH - 20, 12, SSD1306_WHITE);
+    static uint8_t t = 0;
+    uint8_t w = (t * (OLED_WIDTH - 24)) / 32;
+    _oled.fillRect(12, 50, w, 8, SSD1306_WHITE);
+    t = (t + 1) % 32;
+  } else if (phase == 1) {
+    // "Системы онлайн"
+    _oled.setTextSize(2);
+    textCentered(10, "READY!", 2);
+    _oled.setTextSize(1);
+    textCentered(36, "press MENU to start", 1);
+    // декоративная "змейка" вокруг
+    for (uint8_t i = 0; i < 8; i++) {
+      int x = 8 + i * 14;
+      _oled.fillCircle(x, 56, 4, SSD1306_WHITE);
+    }
+  } else {
+    // список игр
+    _oled.setTextSize(2);
+    textCentered(2,  "GAMES", 2);
+    _oled.setTextSize(1);
+    _oled.setCursor(8, 22); _oled.print("> Tug of War");
+    _oled.setCursor(8, 34); _oled.print("  Shooter");
+    _oled.setCursor(8, 46); _oled.print("  Pong");
+    _oled.setCursor(0, 58); _oled.print("MENU: next  HOLD: reset");
+  }
+  _oled.display();
+}
+
 // ============================== Output ==============================
 
 #define BUZZER_CH 0
@@ -175,6 +224,16 @@ static const Note LOSE_NOTES[] = { {660, 80}, {440, 160} };
 
 void Output::winSound()  { melody(WIN_NOTES, 4);  buzz(250); }
 void Output::loseSound() { melody(LOSE_NOTES, 2); buzz(200); }
+
+// "Пиу-пиу-пиу-вжуух" — короткое приветствие при старте.
+static const Note STARTUP_NOTES[] = {
+  { 880, 70 }, { 1175, 70 }, { 1568, 70 }, { 1976, 220 }
+};
+
+void Output::startupFanfare() {
+  melody(STARTUP_NOTES, 4);
+  buzz(350);
+}
 
 // ============================== Button ==============================
 

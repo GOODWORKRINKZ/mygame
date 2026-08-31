@@ -39,6 +39,8 @@ public:
   void splash(const char* title, const char* subtitle);
   void gameFrame(const char* title, int s1, int s2, const char* line1, const char* line2);
   void flush();   // вывод кадра с троттлингом (анти-мерцание)
+  void bootFrame(uint8_t phase);   // кадры заставки при включении (0..2)
+  void textCentered(int y, const char* s, uint8_t size = 1);
 
 private:
   Adafruit_SSD1306 _oled{OLED_WIDTH, OLED_HEIGHT, &Wire, -1};
@@ -65,6 +67,7 @@ public:
   void buzz(uint16_t durMs);           // импульс вибрации
   void winSound();
   void loseSound();
+  void startupFanfare();               // приветствие при включении
 
 private:
   uint32_t _toneEnd = 0;
