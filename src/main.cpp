@@ -61,6 +61,11 @@ void setup() {
   LOG_I("LED", "starting color test on strip...");
   leds.colorTest();
   LOG_I("LED", "color test done");
+
+  // Бегущий огонёк по логическим индексам 0..31 — позволяет понять,
+  // какие пиксели физически работают и в каком порядке.
+  LOG_I("LED", "starting oneByOne test (4 seconds)...");
+  leds.oneByOneTest();
   // ==================================================================
 
   LOG_I("INIT", "dpy.begin() (OLED 128x64 I2C 0x%02X)...", OLED_ADDR);

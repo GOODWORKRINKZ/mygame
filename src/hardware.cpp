@@ -73,6 +73,25 @@ void LedStrip::colorTest() {
   delay(200);
 }
 
+void LedStrip::oneByOneTest() {
+  // Бежит "бегущий огонёк" по логическим индексам. Каждый пиксель горит
+  // 150 мс, остальные погашены. Позволяет увидеть:
+  //   - работают ли вообще все 32 пикселя ленты;
+  //   - в каком порядке они физически расположены;
+  //   - работает ли LUT (логический 0 -> какой физический).
+  LOG_I("LED", "oneByOne: lighting logical pixels 0..%d sequentially", LedMap::COUNT - 1);
+  for (uint8_t i = 0; i < LedMap::COUNT; i++) {
+    clear();
+    setLogical(i, rgb(255, 80, 0));   // яркий оранжевый — легко отличить от шума
+    show();
+    LOG_V("LED", "logical=%u -> physical=%u", i, (unsigned)map[i]);
+    delay(120);
+  }
+  clear();
+  show();
+  LOG_I("LED", "oneByOne done");
+}
+
 // ============================== Display ==============================
 
 void Display::begin() {
