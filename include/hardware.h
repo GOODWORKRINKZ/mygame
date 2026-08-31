@@ -32,7 +32,15 @@ public:
   uint32_t hsv(uint16_t hue, uint8_t sat = 255, uint8_t val = 255);
 
 private:
+  // Если в config.h определён PIN_LED_ALT, используем его (для диагностики),
+  // иначе — основной PIN_LED.
+#ifdef PIN_LED_ALT
+  Adafruit_NeoPixel _strip{LedMap::COUNT, PIN_LED_ALT, NEO_GRB + NEO_KHZ800};
+  static const uint8_t ACTIVE_PIN = PIN_LED_ALT;
+#else
   Adafruit_NeoPixel _strip{LedMap::COUNT, PIN_LED, NEO_GRB + NEO_KHZ800};
+  static const uint8_t ACTIVE_PIN = PIN_LED;
+#endif
 };
 
 // ============================================================

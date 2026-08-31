@@ -8,6 +8,8 @@ void LedStrip::begin() {
   _strip.setBrightness(LED_BRIGHTNESS);
   _strip.clear();
   _strip.show();
+  LOG_I("LED", "strip ready: pin=%d (PIN_LED=%d) count=%d type=WS2812 GRB @800kHz",
+         ACTIVE_PIN, PIN_LED, LedMap::COUNT);
 }
 
 void LedStrip::clear() { _strip.clear(); }
