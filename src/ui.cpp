@@ -2,27 +2,57 @@
 
 namespace Ui {
 
-// Вертикальная граница между половинами экрана.
-static const int SPLIT_X = 63;
-static const int L0 = 0,  L1 = SPLIT_X - 1;
+// ============================================================
+//  Раскладка под двухцветный 0.96" OLED (жёлто-синий):
+//
+//    y= 0..15   ЖЁЛТАЯ зона   — шапка, имя игрока
+//    y=16..17   мёртвая полоса (тут ничего не рисуем)
+//    y=18..63   СИНЯЯ зона    — крупное число, sub, bar, подвал
+//
+//  Все размеры ниже подобраны так, чтобы ни один пиксель текста
+//  или линии не попадал на стык жёлтой и синей зон.
+// ============================================================
+
+static const int SPLIT_X       = 63;
+static const int L0 = 0,        L1 = SPLIT_X - 1;
 static const int R0 = SPLIT_X + 2, R1 = OLED_WIDTH - 1;
 
+// Y-координаты сетки.
+// size=1 глиф = 7 строк + 1 строка под descenders (pg, gy, ц, щ, ю ...).
+// size=2 = 14 строк + 1 строка под descenders.
+// Нижний край экрана = 63. Для size=1 последняя строка глифа = y+6,
+// descender = y+7 — значит курсор не выше y=56.
+static const int Y_RULE_TOP    = 15;   // линия под шапкой (внутри жёлтой зоны)
+static const int Y_NAME        = 16;   // имя игрока (size=1, y=18..24)
+static const int Y_BIG         = 25;   // крупное число (size=2, y=27..40, desc y=41)
+static const int Y_SUB         = 41;   // подпись (size=1, y=43..49, desc y=50)
+static const int Y_BAR         = 49;   // полоска/bar (6px, y=51..56)
+static const int Y_DOTS        = 51;   // ряд точек (r=3, центр y=53 → y=50..56)
+static const int Y_FOOT        = 57;   // текст подвала (y=56..62, desc y=63)
+
+// Вертикальная граница между половинами экрана (только в синей зоне).
+static const int DIV_Y0 = 18;
+static const int DIV_Y1 = 56;
+
 void header(Display& d, const char* left, const char* right) {
+  // title живёт в жёлтой зоне (y=0..7 при size=1, начинаем с y=1)
   d.text(0, 1, left, 1);
   if (right && right[0]) {
     int w = Display::textWidth(right, 1);
     d.text(OLED_WIDTH - w, 1, right, 1);
   }
-  d.gfx().drawFastHLine(0, 10, OLED_WIDTH, SSD1306_WHITE);
+  d.gfx().drawFastHLine(0, Y_RULE_TOP, OLED_WIDTH, SSD1306_WHITE);
 }
 
 void footer(Display& d, const char* text) {
-  d.gfx().drawFastHLine(0, 53, OLED_WIDTH, SSD1306_WHITE);
-  if (text && text[0]) d.textCentered(56, text, 1);
+  // Без линии-разделителя: она бы съела пиксели у подвала.
+  // Достаточно того, что bar/dots выше уже рисуют границу.
+  if (text && text[0]) d.textCentered(Y_FOOT, text, 1);
 }
 
 void divider(Display& d) {
-  d.gfx().drawFastVLine(SPLIT_X, 12, 40, SSD1306_WHITE);
+  // только в синей зоне, чтобы не пересекать мёртвую полосу y=16..17
+  d.gfx().drawFastVLine(SPLIT_X, DIV_Y0, DIV_Y1 - DIV_Y0 + 1, SSD1306_WHITE);
 }
 
 void bar(Display& d, int x, int y, int w, int h, int pct) {
@@ -47,23 +77,23 @@ static void drawPanel(Display& d, int x0, int x1, const Panel& p) {
   int cx = (x0 + x1) / 2;
 
   if (p.active) {
-    // подсвеченное имя — белая плашка с инверсным текстом
-    d.gfx().fillRect(x0, 11, x1 - x0 + 1, 10, SSD1306_WHITE);
+    // подсвеченное имя — белая плашка с инверсным текстом (строго в синей зоне)
+    d.gfx().fillRect(x0, Y_NAME, x1 - x0 + 1, 8, SSD1306_WHITE);
     d.gfx().setTextColor(SSD1306_BLACK);
-    d.textCenteredIn(x0, x1, 12, p.name, 1);
+    d.textCenteredIn(x0, x1, Y_NAME, p.name, 1);
     d.gfx().setTextColor(SSD1306_WHITE);
   } else {
-    d.textCenteredIn(x0, x1, 12, p.name, 1);
+    d.textCenteredIn(x0, x1, Y_NAME, p.name, 1);
   }
 
-  d.textCenteredIn(x0, x1, 22, p.big, 2);
+  d.textCenteredIn(x0, x1, Y_BIG, p.big, 2);
 
-  if (p.sub && p.sub[0]) d.textCenteredIn(x0, x1, 40, p.sub, 1);
+  if (p.sub && p.sub[0]) d.textCenteredIn(x0, x1, Y_SUB, p.sub, 1);
 
   if (p.dots >= 0 && p.dotsMax > 0) {
-    dotsRow(d, cx, 49, p.dotsMax, p.dots);
+    dotsRow(d, cx, Y_DOTS, p.dotsMax, p.dots);
   } else if (p.bar >= 0) {
-    bar(d, x0 + 6, 46, (x1 - x0) - 11, 6, p.bar);
+    bar(d, x0 + 6, Y_BAR, (x1 - x0) - 11, 6, p.bar);
   }
 }
 
@@ -82,23 +112,25 @@ void solo(Display& d, const char* title, const char* right,
           const char* big, const char* line1, const char* line2, const char* foot) {
   d.clear();
   header(d, title, right);
+  // size=3 (21px) идёт в верхнюю часть синей зоны (y=18..38),
+  // size=2 (14px) занимает y=24..37, помещается под sub.
   uint8_t size = (Display::textWidth(big, 3) <= OLED_WIDTH - 4) ? 3 : 2;
-  d.textCentered(size == 3 ? 14 : 18, big, size);
-  if (line1 && line1[0]) d.textCentered(39, line1, 1);
-  if (line2 && line2[0]) d.textCentered(45, line2, 1);
+  d.textCentered(size == 3 ? 18 : Y_BIG, big, size);
+  if (line1 && line1[0]) d.textCentered(Y_SUB, line1, 1);
+  if (line2 && line2[0]) d.textCentered(Y_FOOT, line2, 1);
   footer(d, foot);
   d.flush();
 }
 
 void banner(Display& d, const char* big, const char* sub, const char* foot) {
   d.clear();
-  // рамка
-  d.gfx().drawRect(0, 0, OLED_WIDTH, 52, SSD1306_WHITE);
-  d.gfx().drawRect(2, 2, OLED_WIDTH - 4, 48, SSD1306_WHITE);
+  // рамка (только в синей зоне, чтобы не упираться в мёртвую полосу)
+  d.gfx().drawRect(0, 18, OLED_WIDTH, 46, SSD1306_WHITE);
+  d.gfx().drawRect(2, 20, OLED_WIDTH - 4, 42, SSD1306_WHITE);
   uint8_t size = (Display::textWidth(big, 3) <= OLED_WIDTH - 10) ? 3 : 2;
-  d.textCentered(size == 3 ? 12 : 16, big, size);
-  if (sub && sub[0]) d.textCentered(size == 3 ? 38 : 34, sub, 1);
-  if (foot && foot[0]) d.textCentered(56, foot, 1);
+  d.textCentered(size == 3 ? 18 : Y_BIG, big, size);
+  if (sub && sub[0]) d.textCentered(Y_SUB, sub, 1);
+  if (foot && foot[0]) d.textCentered(Y_FOOT, foot, 1);
   d.flush();
 }
 
@@ -109,17 +141,23 @@ void menuFrame(Display& d, const char* title, const char* const* items,
   snprintf(right, sizeof right, "%d/%d", sel + 1, count);
   header(d, title, right);
 
-  // окно на 4 строки, выбранный пункт держим внутри
+  // окно на 4 строки, выбранный пункт держим внутри.
+  // строки начинаем с y=18 в синей зоне, шаг 9 (size=1 глиф=7 + 2 зазор)
+  // → 18, 27, 36, 45 — все до линии подвала Y_RULE_BOT=54.
   const int rows = 4;
+  const int ROW_Y0 = 18;
+  const int ROW_DY = 9;
   int top = sel - rows / 2;
   if (top > count - rows) top = count - rows;
   if (top < 0) top = 0;
 
   for (int r = 0; r < rows && (top + r) < count; r++) {
     int idx = top + r;
-    int y = 14 + r * 10;
+    int y = ROW_Y0 + r * ROW_DY;
     bool cur = (idx == sel);
-    if (cur) d.gfx().fillRect(0, y - 1, OLED_WIDTH, 10, SSD1306_WHITE);
+    // плашка выбранной строки строго в синей зоне (y=18..56).
+    // текст size=1 глиф y+0..y+6, descender y+7; плашка = 8px начиная с y.
+    if (cur) d.gfx().fillRect(0, y, OLED_WIDTH, 8, SSD1306_WHITE);
     d.gfx().setTextColor(cur ? SSD1306_BLACK : SSD1306_WHITE);
 
     char tag[6];
@@ -137,20 +175,23 @@ void menuFrame(Display& d, const char* title, const char* const* items,
 void bootFrame(Display& d, uint8_t phase, uint8_t progress) {
   d.clear();
   if (phase == 0) {
-    d.textCentered(6, "LED", 3);
-    d.textCentered(30, "АРКАДА", 2);
-    bar(d, 14, 50, OLED_WIDTH - 28, 8, progress);
+    // заголовок в жёлтой зоне (size=1 глиф y=1..7, помещается)
+    d.textCentered(1, "LED ARCADE", 1);
+    d.textCentered(Y_BIG, "АРКАДА", 2);
+    bar(d, 14, Y_BAR, OLED_WIDTH - 28, 6, progress);
   } else if (phase == 1) {
-    d.textCentered(10, "ГОТОВ", 3);
-    d.textCentered(38, "32 ПИКСЕЛЯ ВЕСЕЛЬЯ", 1);
+    d.textCentered(Y_BIG, "ГОТОВ", 2);
+    d.textCentered(Y_SUB, "32 ПИКСЕЛЯ ВЕСЕЛЬЯ", 1);
+    // точки по самому низу (r=2), центр y=Y_FOOT+3 → y=Y_FOOT+1..Y_FOOT+5
     for (uint8_t i = 0; i < 8; i++)
-      d.gfx().fillCircle(8 + i * 16, 56, 3, SSD1306_WHITE);
+      d.gfx().fillCircle(8 + i * 16, Y_FOOT + 3, 2, SSD1306_WHITE);
   } else {
-    d.textCentered(4, "УПРАВЛЕНИЕ", 1);
-    d.text(2, 16, "ЗЕЛЕНАЯ = ИГРОК 1", 1);
-    d.text(2, 26, "СИНЯЯ = ИГРОК 2", 1);
-    d.text(2, 36, "МЕНЮ = ВЫБОР", 1);
-    d.text(2, 46, "УДЕРЖ = НАЗАД/РЕСТАРТ", 1);
+    // заголовок в жёлтой зоне, всё остальное — в синей
+    d.textCentered(1, "УПРАВЛЕНИЕ", 1);
+    d.gfx().drawFastHLine(0, Y_RULE_TOP, OLED_WIDTH, SSD1306_WHITE);
+    d.textCentered(Y_NAME, "ЗЕЛ=ВНИЗ", 1);
+    d.textCentered(Y_BIG,  "СИН=ВВЕРХ", 2);
+    d.textCentered(Y_FOOT, "МЕНЮ=ВЫБОР  УДЕРЖ=ТЕСТ", 1);
   }
   d.flushNow();
 }
