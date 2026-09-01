@@ -261,8 +261,9 @@ void loop() {
 
   switch (state) {
     case AppState::Menu:
-      if (in.p1.pressed || btnP1.repeat()) { manager.prev(); out.sfx(Sfx::Click); }
-      if (in.p2.pressed || btnP2.repeat()) { manager.next(); out.sfx(Sfx::Click); }
+      // Зелёная (физически справа) — листает ВНИЗ, синяя (слева) — ВВЕРХ.
+      if (in.p1.pressed || btnP1.repeat()) { manager.next(); out.sfx(Sfx::Click); }
+      if (in.p2.pressed || btnP2.repeat()) { manager.prev(); out.sfx(Sfx::Click); }
       if (menuShort) { out.sfx(Sfx::Select); enterPlay(); break; }
       if (menuLong)  { runDiagnostics(); lastFrame = millis(); }
       updateMenu(in, c);
