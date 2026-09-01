@@ -13,9 +13,7 @@ namespace Ui {
 //  или линии не попадал на стык жёлтой и синей зон.
 // ============================================================
 
-static const int SPLIT_X       = 63;
-static const int L0 = 0,        L1 = SPLIT_X - 1;
-static const int R0 = SPLIT_X + 2, R1 = OLED_WIDTH - 1;
+static const int SPLIT_X       = 63;   // колонка-разделитель половин
 
 // Y-координаты сетки.
 // size=1 глиф = 7 строк + 1 строка под descenders (pg, gy, ц, щ, ю ...).
@@ -73,38 +71,85 @@ void dotsRow(Display& d, int cx, int y, int total, int filled) {
   }
 }
 
-static void drawPanel(Display& d, int x0, int x1, const Panel& p) {
-  int cx = (x0 + x1) / 2;
+// ============================================================
+//  Сплит-экран игр на двоих: каждая половина повёрнута к своему
+//  игроку. Тот, кто сидит слева, читает своё табло повёрнутым по
+//  часовой стрелке, тот, кто справа — против часовой.
+//
+//  Жёлтая полоса (y=0..15) остаётся общей и неповёрнутой: там имя
+//  игры, номер раунда и строка события — их читают оба, и она всё
+//  равно слишком узкая для повёрнутого текста.
+//
+//  Повороты делает сам Adafruit_GFX: при setRotation(1)/(3) экран
+//  для рисования становится 64 (x) на 128 (y), а пиксель ложится
+//  на физический так:
+//      rot=1: (px, py) = (127 - y, x)      читается СЛЕВА
+//      rot=3: (px, py) = (y, 63 - x)       читается СПРАВА
+//  Отсюда обе панели живут в y=65..127 (это физические половины по
+//  краям от разделителя), а синяя зона по x — это 18..63 при rot=1
+//  и 0..45 при rot=3. В обоих случаях строки идут вниз по +y с
+//  точки зрения своего игрока — раскладка панели общая.
+// ============================================================
+
+static const int RP_Y0   = 65;   // край панели у центра экрана (верх для игрока)
+static const int RP_W    = 46;   // ширина синей зоны панели
+static const int RP_NAME = 3;    // имя игрока
+static const int RP_BIG  = 13;   // крупное значение
+static const int RP_SUB  = 37;   // подпись
+static const int RP_BAR  = 48;   // полоска / ряд точек
+
+static void drawPanelRot(Display& d, uint8_t rot, const Panel& p) {
+  d.gfx().setRotation(rot);
+
+  const int x0 = (rot == 1) ? 18 : 0;      // синяя зона в повёрнутых координатах
+  const int x1 = x0 + RP_W - 1;
+  const int cx = (x0 + x1) / 2;
+  const int y  = RP_Y0;
 
   if (p.active) {
-    // подсвеченное имя — белая плашка с инверсным текстом (строго в синей зоне)
-    d.gfx().fillRect(x0, Y_NAME, x1 - x0 + 1, 8, SSD1306_WHITE);
+    d.gfx().fillRect(x0, y + RP_NAME, RP_W, 8, SSD1306_WHITE);
     d.gfx().setTextColor(SSD1306_BLACK);
-    d.textCenteredIn(x0, x1, Y_NAME, p.name, 1);
+    d.textCenteredIn(x0, x1, y + RP_NAME, p.name, 1);
     d.gfx().setTextColor(SSD1306_WHITE);
   } else {
-    d.textCenteredIn(x0, x1, Y_NAME, p.name, 1);
+    d.textCenteredIn(x0, x1, y + RP_NAME, p.name, 1);
   }
 
-  d.textCenteredIn(x0, x1, Y_BIG, p.big, 2);
+  // крупное значение занимает всю ширину панели, сколько влезет
+  uint8_t size = 1;
+  if (Display::textWidth(p.big, 3) <= RP_W)      size = 3;
+  else if (Display::textWidth(p.big, 2) <= RP_W) size = 2;
+  d.textCenteredIn(x0, x1, y + RP_BIG, p.big, size);
 
-  if (p.sub && p.sub[0]) d.textCenteredIn(x0, x1, Y_SUB, p.sub, 1);
+  if (p.sub && p.sub[0]) d.textCenteredIn(x0, x1, y + RP_SUB, p.sub, 1);
 
   if (p.dots >= 0 && p.dotsMax > 0) {
-    dotsRow(d, cx, Y_DOTS, p.dotsMax, p.dots);
+    dotsRow(d, cx, y + RP_BAR + 3, p.dotsMax, p.dots);
   } else if (p.bar >= 0) {
-    bar(d, x0 + 6, Y_BAR, (x1 - x0) - 11, 6, p.bar);
+    bar(d, x0 + 3, y + RP_BAR, RP_W - 6, 6, p.bar);
   }
+
+  d.gfx().setRotation(0);
 }
 
 void split(Display& d, const char* title, const char* right,
            const Panel& left, const Panel& rightPanel, const char* foot) {
   d.clear();
-  header(d, title, right);
-  divider(d);
-  drawPanel(d, L0, L1, left);
-  drawPanel(d, R0, R1, rightPanel);
-  footer(d, foot);
+
+  // общая жёлтая шапка: строка игры и строка события
+  d.text(0, 0, title, 1);
+  if (right && right[0]) {
+    int w = Display::textWidth(right, 1);
+    d.text(OLED_WIDTH - w, 0, right, 1);
+  }
+  if (foot && foot[0]) d.textCentered(8, foot, 1);
+
+  // разделитель половин — только в синей зоне
+  d.gfx().drawFastVLine(SPLIT_X, DIV_Y0, DIV_Y1 - DIV_Y0 + 1, SSD1306_WHITE);
+
+  drawPanelRot(d, 1, left);        // левая половина — для игрока слева
+  drawPanelRot(d, 3, rightPanel);  // правая половина — для игрока справа
+
   d.flush();
 }
 
@@ -161,7 +206,9 @@ void menuFrame(Display& d, const char* title, const char* const* items,
     d.gfx().setTextColor(cur ? SSD1306_BLACK : SSD1306_WHITE);
 
     char tag[6];
-    snprintf(tag, sizeof tag, "%dИ", playerCounts ? playerCounts[idx] : 2);
+    uint8_t pc = playerCounts ? playerCounts[idx] : 2;
+    if (pc == 3) snprintf(tag, sizeof tag, "КО");     // кооператив
+    else         snprintf(tag, sizeof tag, "%dИ", pc);
     d.text(2, y, cur ? ">" : " ", 1);
     d.text(10, y, items[idx], 1);
     d.text(OLED_WIDTH - 14, y, tag, 1);

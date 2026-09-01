@@ -108,6 +108,76 @@
 #define DEFENDER_MAX_ENEMY 8
 #define DEFENDER_NUKES     3
 
+// --- TRAFFIC (СТОП-СИГНАЛ, 2 игрока) ---
+#define TRAFFIC_WAIT_MIN     900     // пауза перед сигналом, мс
+#define TRAFFIC_WAIT_MAX     3400
+#define TRAFFIC_WINDOW_MS    700     // сколько горит сигнал
+#define TRAFFIC_RED_PERCENT  45      // доля "красных" сигналов (жать нельзя)
+
+// --- FIGHT (БОЙ, 2 игрока) ---
+#define FIGHT_HP             4
+#define FIGHT_STAMINA        3.0f    // полный запас стамины
+#define FIGHT_GUARD_DRAIN    1.5f    // расход стамины в секунду при блоке
+#define FIGHT_REGEN          1.0f    // восстановление в секунду
+#define FIGHT_BLOCK_COST     0.9f    // стамина за отражённый удар
+#define FIGHT_ATTACK_COST    0.6f    // стамина за удар
+#define FIGHT_ATTACK_MS      420     // время полёта удара до соперника
+#define FIGHT_COOLDOWN_MS    240
+#define FIGHT_STUN_MS        700     // ступор после парирования / пробитого блока
+#define FIGHT_GUARD_MS       130     // держишь дольше — это блок, короче — удар
+
+// --- GREED (ЖАДНОСТЬ, 2 игрока) ---
+#define GREED_MAX_LEN        13      // максимум пикселей в своей половине
+#define GREED_RATE           5.0f    // пикселей в секунду при удержании
+#define GREED_MINE_MIN       4       // ближе этого мина не ставится
+#define GREED_ROUND_MS       14000   // общий лимит времени на раунд
+
+// --- CHASE (ДОГОНЯЛКИ, 2 игрока, кольцо) ---
+#define CHASE_IMPULSE        3.0f
+#define CHASE_FRICTION       2.5f
+#define CHASE_HUNTER_BONUS   1.16f   // насколько охотник резвее беглеца
+#define CHASE_TIME_MS        14000   // столько длится погоня
+#define CHASE_CATCH_DIST     0.9f    // на таком расстоянии считается "поймал"
+
+// --- HUNT (КЛАД, 2 игрока) ---
+#define HUNT_SPEED_START     12.0f   // скорость курсора, пикс/с
+#define HUNT_SPEED_UP        1.045f  // ускорение после каждого выстрела
+#define HUNT_MAX_MARKS       16      // сколько отметок помним
+
+// --- TOWER (БАШНЯ, 1 игрок) ---
+#define TOWER_WIDTH_START    5
+#define TOWER_SPEED_START    9.0f
+#define TOWER_SPEED_UP       1.06f
+
+// --- SNAKE (ЗМЕЙКА, 1 игрок, кольцо) ---
+#define SNAKE_STEP_START     240     // мс на один шаг
+#define SNAKE_STEP_MIN       95
+#define SNAKE_STEP_UP        0.965f  // ускорение после каждой еды
+#define SNAKE_START_LEN      3
+#define SNAKE_MAX_LEN        24
+
+// --- RHYTHM (РИТМ, 1 игрок) ---
+#define RHYTHM_HIT_POS       3       // где стоит "наковальня"
+#define RHYTHM_BEAT_START    620     // мс между долями
+#define RHYTHM_BEAT_MIN      280
+#define RHYTHM_BEAT_UP       0.94f   // ускорение темпа каждые 8 нот
+#define RHYTHM_LIVES         3
+#define RHYTHM_MAX_NOTES     8
+
+// --- SYNC (СИНХРОН, кооператив) ---
+#define SYNC_TOL_START       260     // допуск по времени, мс
+#define SYNC_TOL_MIN         45
+#define SYNC_TOL_UP          0.88f   // сужение допуска за уровень
+#define SYNC_LIVES           3
+#define SYNC_TRAVEL_MS       1500    // сколько летят импульсы до центра
+
+// --- SIEGE (ОСАДА, кооператив) ---
+#define SIEGE_LIVES          5
+#define SIEGE_MAX_ENEMY      10
+#define SIEGE_MAX_BULLETS    8
+#define SIEGE_KILLS_PER_WAVE 10
+#define SIEGE_COOLDOWN_MS    220
+
 // ---------------- Диагностика ----------------
 // 1 = при каждом включении гонять тесты ленты (медленно, ~6 с).
 // В обычном режиме те же тесты доступны из меню: пункт "DIAGNOSTIC".

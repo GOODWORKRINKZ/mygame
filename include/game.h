@@ -59,6 +59,9 @@ public:
   virtual const char* name() const = 0;        // как показывать в меню
   virtual const char* hint() const { return ""; }  // подсказка в подвале
   virtual uint8_t players() const { return 2; }    // 1 или 2
+  // Кооператив: играют вдвоём, но против консоли и с общим счётом.
+  // В меню такие игры помечаются "КО" вместо "1И"/"2И".
+  virtual bool    coop() const { return false; }
   virtual Color   theme() const { return rgb(180, 180, 180); }  // цвет в меню
   virtual RuleText rules() const { return RuleText(); }  // экран "как играть"
 

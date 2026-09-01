@@ -111,5 +111,7 @@ void Store::wipe() {
 }
 
 const char* playersLabel(uint8_t n) {
-  return n == 1 ? "1И" : "2И";
+  if (n == 1) return "1И";
+  if (n == 3) return "КО";      // кооператив
+  return "2И";
 }

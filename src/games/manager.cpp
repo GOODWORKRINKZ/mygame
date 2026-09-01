@@ -15,10 +15,21 @@ GameManager::GameManager() {
   _games[7] = &_simon;
   _games[8] = &_runner;
   _games[9] = &_defender;
+  _games[10] = &_traffic;
+  _games[11] = &_fight;
+  _games[12] = &_greed;
+  _games[13] = &_chase;
+  _games[14] = &_hunt;
+  _games[15] = &_tower;
+  _games[16] = &_snake;
+  _games[17] = &_rhythm;
+  _games[18] = &_sync;
+  _games[19] = &_siege;
 
   for (int i = 0; i < COUNT; i++) {
-    _names[i]   = _games[i]->name();
-    _players[i] = _games[i]->players();
+    _names[i] = _games[i]->name();
+    // 3 — служебное значение "кооператив", меню рисует его как "КО"
+    _players[i] = _games[i]->coop() ? 3 : _games[i]->players();
   }
 }
 
