@@ -10,8 +10,8 @@
 #define PIN_LED        10   // DATA ленты WS2812 (через резистор 330-470 Ом)
 #define PIN_OLED_SDA    4
 #define PIN_OLED_SCL    5
-#define PIN_BTN_P1      1   // зелёная кнопка (игрок 1, левый край ленты)
-#define PIN_BTN_P2      0   // синяя кнопка  (игрок 2, правый край ленты)
+#define PIN_BTN_P1      0   // зелёная кнопка (игрок 1, левый край ленты)
+#define PIN_BTN_P2      1   // синяя кнопка  (игрок 2, правый край ленты)
 #define PIN_BTN_MENU    3   // маленькая кнопка управления
 #define PIN_BUZZER      7   // бузер (через транзистор)
 #define PIN_VIBRO       6   // вибромоторчик (через транзистор)
