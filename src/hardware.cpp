@@ -1,4 +1,5 @@
 #include "hardware.h"
+#include "font_ru.h"
 #include <math.h>
 
 // ============================================================
@@ -258,6 +259,34 @@ void Display::begin() {
   _oled.display();
   _oled.setTextColor(SSD1306_WHITE);
   _oled.setTextWrap(false);
+  _oled.setFont(&FontRu5x7);
+}
+
+// Строки в коде — UTF-8. Шрифт FontRu5x7 индексируется однобайтовыми кодами:
+// ASCII как есть, а кириллица А..Я (U+0410..U+042F) — кодами 0x80..0x9F
+// (см. include/font_ru.h). Строчные буквы и "Ё" не поддерживаются — весь
+// интерфейс на экране пишется ЗАГЛАВНЫМИ.
+static int utf8ToFontCodes(const char* s, uint8_t* out, int cap) {
+  int n = 0;
+  while (*s && n < cap - 1) {
+    uint8_t b0 = (uint8_t)*s;
+    uint32_t cp;
+    if (b0 < 0x80) {
+      cp = b0;
+      s += 1;
+    } else if ((b0 & 0xE0) == 0xC0 && s[1]) {
+      cp = ((uint32_t)(b0 & 0x1F) << 6) | ((uint8_t)s[1] & 0x3F);
+      s += 2;
+    } else {
+      cp = '?';
+      s += 1;
+    }
+    if (cp >= 0x0410 && cp <= 0x042F) out[n++] = (uint8_t)(0x80 + (cp - 0x0410));
+    else if (cp < 0x80)               out[n++] = (uint8_t)cp;
+    else                               out[n++] = '?';
+  }
+  out[n] = 0;
+  return n;
 }
 
 void Display::clear() { _oled.clearDisplay(); }
@@ -276,13 +305,17 @@ void Display::flushNow() {
 }
 
 int Display::textWidth(const char* s, uint8_t size) {
-  return (int)strlen(s) * 6 * size;
+  uint8_t buf[96];
+  int n = utf8ToFontCodes(s, buf, sizeof buf);
+  return n * 6 * size;
 }
 
 void Display::text(int x, int y, const char* s, uint8_t size) {
+  uint8_t buf[96];
+  int n = utf8ToFontCodes(s, buf, sizeof buf);
   _oled.setTextSize(size);
   _oled.setCursor(x, y);
-  _oled.print(s);
+  for (int i = 0; i < n; i++) _oled.write(buf[i]);
 }
 
 void Display::textCentered(int y, const char* s, uint8_t size) {

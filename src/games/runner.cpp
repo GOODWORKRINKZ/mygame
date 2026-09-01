@@ -46,9 +46,9 @@ void RunnerGame::update(const Inputs& in, Ctx& c) {
     if (c.now >= overUntil + 6000) { reset(); return; }
     Bg::confetti(c.leds, c.now, rgb(120, 0, 0), rgb(50, 0, 0));
     char sub[20];
-    snprintf(sub, sizeof sub, "SCORE %d", score);
-    Ui::banner(c.dpy, "GAME OVER", sub,
-               newRecord ? "NEW RECORD!" : "press to retry");
+    snprintf(sub, sizeof sub, "ОЧКИ %d", score);
+    Ui::banner(c.dpy, "КОНЕЦ ИГРЫ", sub,
+               newRecord ? "НОВЫЙ РЕКОРД!" : "ЖМИ ДЛЯ ПОВТОРА");
     return;
   }
 
@@ -141,11 +141,11 @@ void RunnerGame::render(Ctx& c) {
 void RunnerGame::oled(Ctx& c) {
   char big[10], l1[24], l2[24], right[8], foot[24];
   snprintf(big, sizeof big, "%d", score);
-  snprintf(l1, sizeof l1, "SPEED %d", (int)speed);
-  snprintf(l2, sizeof l2, "BEST %d", best);
+  snprintf(l1, sizeof l1, "СКОРОСТЬ %d", (int)speed);
+  snprintf(l2, sizeof l2, "РЕКОРД %d", best);
   snprintf(right, sizeof right, "x%d", lives);
 
-  const char* act = (action == 1) ? "JUMP" : (action == 2) ? "SLIDE" : "";
+  const char* act = (action == 1) ? "ПРЫЖОК" : (action == 2) ? "ПОДКАТ" : "";
   if (act[0]) snprintf(foot, sizeof foot, "%s", act);
   else        snprintf(foot, sizeof foot, "%s", hint());
 

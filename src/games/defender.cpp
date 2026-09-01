@@ -101,9 +101,9 @@ void DefenderGame::update(const Inputs& in, Ctx& c) {
     if (c.now >= overUntil + 6000) { reset(); return; }
     Bg::confetti(c.leds, c.now, rgb(120, 0, 0), rgb(50, 0, 0));
     char sub[20];
-    snprintf(sub, sizeof sub, "SCORE %d", score);
-    Ui::banner(c.dpy, "GAME OVER", sub,
-               newRecord ? "NEW RECORD!" : "press to retry");
+    snprintf(sub, sizeof sub, "ОЧКИ %d", score);
+    Ui::banner(c.dpy, "КОНЕЦ ИГРЫ", sub,
+               newRecord ? "НОВЫЙ РЕКОРД!" : "ЖМИ ДЛЯ ПОВТОРА");
     return;
   }
 
@@ -224,15 +224,15 @@ void DefenderGame::render(Ctx& c) {
 }
 
 void DefenderGame::oled(Ctx& c) {
-  char big[10], l1[24], l2[24], right[10], foot[24];
+  char big[10], l1[32], l2[32], right[10], foot[32];
   snprintf(big, sizeof big, "%d", score);
-  snprintf(l1, sizeof l1, "WAVE %d  NUKE %d", wave, nukes);
-  snprintf(l2, sizeof l2, "BEST %d", best);
-  snprintf(right, sizeof right, "W%d", wave);
+  snprintf(l1, sizeof l1, "ВОЛНА %d  ВЗРЫВ %d", wave, nukes);
+  snprintf(l2, sizeof l2, "РЕКОРД %d", best);
+  snprintf(right, sizeof right, "В%d", wave);
 
   char hearts[8] = "";
   for (int i = 0; i < lives && i < 5; i++) strcat(hearts, "*");
-  snprintf(foot, sizeof foot, "BASE %s   %d/%d", hearts, killsInWave, KILLS_PER_WAVE);
+  snprintf(foot, sizeof foot, "БАЗА %s   %d/%d", hearts, killsInWave, KILLS_PER_WAVE);
 
   Ui::solo(c.dpy, name(), right, big, l1, l2, foot);
 }

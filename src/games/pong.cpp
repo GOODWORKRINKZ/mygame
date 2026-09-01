@@ -192,31 +192,31 @@ void PongGame::render(Ctx& c) {
 }
 
 void PongGame::oled(Ctx& c) {
-  char b1[6], b2[6], s1[12], s2[12], foot[24];
+  char b1[6], b2[6], s1[16], s2[16], foot[32];
   snprintf(b1, sizeof b1, "%d", m.score[0]);
   snprintf(b2, sizeof b2, "%d", m.score[1]);
 
   for (int p = 0; p < 2; p++) {
     char* dst = (p == 0) ? s1 : s2;
     switch (pad[p].phase) {
-      case PaddlePhase::Charging: snprintf(dst, 12, "PULL %d", (int)pad[p].charge); break;
-      case PaddlePhase::Strike:   strcpy(dst, "STRIKE!"); break;
-      case PaddlePhase::Return:   strcpy(dst, "return"); break;
-      default:                    strcpy(dst, "ready"); break;
+      case PaddlePhase::Charging: snprintf(dst, 16, "ТЯНИ %d", (int)pad[p].charge); break;
+      case PaddlePhase::Strike:   strcpy(dst, "УДАР!"); break;
+      case PaddlePhase::Return:   strcpy(dst, "ВОЗВРАТ"); break;
+      default:                    strcpy(dst, "ГОТОВ"); break;
     }
   }
 
   Panel l, r;
   int bar1 = (int)((pad[0].charge / PONG_PADDLE_MAX) * 100.0f);
   int bar2 = (int)((pad[1].charge / PONG_PADDLE_MAX) * 100.0f);
-  l.name = "GREEN"; l.big = b1; l.sub = s1; l.bar = bar1; l.active = (m.winner == 1);
-  r.name = "BLUE";  r.big = b2; r.sub = s2; r.bar = bar2; r.active = (m.winner == 2);
+  l.name = "ЗЕЛЕНЫЙ"; l.big = b1; l.sub = s1; l.bar = bar1; l.active = (m.winner == 1);
+  r.name = "СИНИЙ";   r.big = b2; r.sub = s2; r.bar = bar2; r.active = (m.winner == 2);
 
   const char* f = foot;
-  if (m.over())        f = (m.winner == 1) ? "GREEN WINS THE MATCH" : "BLUE WINS THE MATCH";
-  else if (m.winner)   f = "goal!";
-  else if (serveAt)    f = "get ready...";
-  else                 snprintf(foot, sizeof foot, "rally %d", rally);
+  if (m.over())        f = (m.winner == 1) ? "ЗЕЛЕНЫЙ ПОБЕДИЛ" : "СИНИЙ ПОБЕДИЛ";
+  else if (m.winner)   f = "ГОЛ!";
+  else if (serveAt)    f = "ПРИГОТОВЬСЯ...";
+  else                 snprintf(foot, sizeof foot, "РОЗЫГРЫШ %d", rally);
 
   drawMatchOled(c, name(), m, l, r, f);
 }

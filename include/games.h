@@ -9,8 +9,8 @@
 // ============================================================
 class TugGame : public Game {
 public:
-  const char* name() const override { return "TUG OF WAR"; }
-  const char* hint() const override { return "mash! push out of zone"; }
+  const char* name() const override { return "КАНАТ"; }
+  const char* hint() const override { return "ДОЛБИ! ВЫШИБИ ИЗ ЗОНЫ"; }
   Color theme() const override { return rgb(255, 120, 0); }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
@@ -41,8 +41,8 @@ struct Shot {
 
 class ShooterGame : public Game {
 public:
-  const char* name() const override { return "SHOOTER"; }
-  const char* hint() const override { return "tap=shot  hold=charged"; }
+  const char* name() const override { return "СТРЕЛОК"; }
+  const char* hint() const override { return "ТАП=ОГОНЬ УДЕРЖ=ЗАРЯД"; }
   Color theme() const override { return rgb(255, 40, 40); }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
@@ -81,8 +81,8 @@ struct Paddle {
 
 class PongGame : public Game {
 public:
-  const char* name() const override { return "PONG"; }
-  const char* hint() const override { return "hold to charge, release"; }
+  const char* name() const override { return "ПОНГ"; }
+  const char* hint() const override { return "ДЕРЖИ ЗАРЯД, ОТПУСТИ"; }
   Color theme() const override { return rgb(0, 220, 220); }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
@@ -109,8 +109,8 @@ private:
 // ============================================================
 class DuelGame : public Game {
 public:
-  const char* name() const override { return "DUEL"; }
-  const char* hint() const override { return "wait for the flash!"; }
+  const char* name() const override { return "ДУЭЛЬ"; }
+  const char* hint() const override { return "ЖДИ ВСПЫШКУ!"; }
   Color theme() const override { return rgb(255, 255, 255); }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
@@ -136,8 +136,8 @@ private:
 // ============================================================
 class SprintGame : public Game {
 public:
-  const char* name() const override { return "SPRINT"; }
-  const char* hint() const override { return "run to the far end"; }
+  const char* name() const override { return "СПРИНТ"; }
+  const char* hint() const override { return "БЕГИ ДО КРАЯ"; }
   Color theme() const override { return rgb(255, 220, 0); }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
@@ -162,8 +162,8 @@ private:
 // ============================================================
 class BombGame : public Game {
 public:
-  const char* name() const override { return "HOT BOMB"; }
-  const char* hint() const override { return "hit it back in your zone"; }
+  const char* name() const override { return "БОМБА"; }
+  const char* hint() const override { return "ОТБЕЙ В СВОЕЙ ЗОНЕ"; }
   Color theme() const override { return rgb(255, 60, 0); }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
@@ -190,8 +190,8 @@ private:
 // ============================================================
 class SniperGame : public Game {
 public:
-  const char* name() const override { return "SNIPER"; }
-  const char* hint() const override { return "GREEN: stop in the zone"; }
+  const char* name() const override { return "СНАЙПЕР"; }
+  const char* hint() const override { return "ЗЕЛЕНАЯ: СТОП В ЗОНЕ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(255, 0, 120); }
   void reset() override;
@@ -225,8 +225,8 @@ private:
 // ============================================================
 class SimonGame : public Game {
 public:
-  const char* name() const override { return "SIMON"; }
-  const char* hint() const override { return "repeat the sequence"; }
+  const char* name() const override { return "САЙМОН"; }
+  const char* hint() const override { return "ПОВТОРИ СЕРИЮ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(160, 0, 255); }
   void reset() override;
@@ -266,8 +266,8 @@ struct Obstacle {
 
 class RunnerGame : public Game {
 public:
-  const char* name() const override { return "RUNNER"; }
-  const char* hint() const override { return "RED:jump(G) BLUE:slide(B)"; }
+  const char* name() const override { return "БЕГУН"; }
+  const char* hint() const override { return "КР=ПРЫЖОК СИН=ПОДКАТ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(0, 255, 160); }
   void reset() override;
@@ -314,8 +314,8 @@ struct Bullet {
 
 class DefenderGame : public Game {
 public:
-  const char* name() const override { return "DEFENDER"; }
-  const char* hint() const override { return "G:shoot  B:nuke"; }
+  const char* name() const override { return "ЗАЩИТА"; }
+  const char* hint() const override { return "З=ВЫСТРЕЛ С=ВЗРЫВ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(0, 160, 255); }
   void reset() override;

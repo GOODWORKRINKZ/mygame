@@ -167,29 +167,29 @@ void SimonGame::render(Ctx& c) {
 void SimonGame::oled(Ctx& c) {
   if (ph == Ph::Over) {
     char sub[20];
-    snprintf(sub, sizeof sub, "LEVEL %d", len - 1 > 0 ? len - 1 : 0);
-    Ui::banner(c.dpy, "GAME OVER", sub,
-               newRecord ? "NEW RECORD!" : "press to retry");
+    snprintf(sub, sizeof sub, "УРОВЕНЬ %d", len - 1 > 0 ? len - 1 : 0);
+    Ui::banner(c.dpy, "КОНЕЦ ИГРЫ", sub,
+               newRecord ? "НОВЫЙ РЕКОРД!" : "ЖМИ ДЛЯ ПОВТОРА");
     return;
   }
 
   char big[10], l1[24], l2[24], right[8];
   snprintf(big, sizeof big, "%d", len);
-  snprintf(l2, sizeof l2, "BEST %d", best);
+  snprintf(l2, sizeof l2, "РЕКОРД %d", best);
   snprintf(right, sizeof right, "%d", len);
 
   const char* foot;
   switch (ph) {
     case Ph::Show:
-    case Ph::Gap:   foot = "WATCH..."; break;
-    case Ph::Input: foot = "YOUR TURN"; break;
-    case Ph::Good:  foot = "CORRECT!"; break;
-    case Ph::Bad:   foot = "WRONG!"; break;
-    default:        foot = "get ready"; break;
+    case Ph::Gap:   foot = "СМОТРИ..."; break;
+    case Ph::Input: foot = "ТВОЙ ХОД"; break;
+    case Ph::Good:  foot = "ВЕРНО!"; break;
+    case Ph::Bad:   foot = "ОШИБКА!"; break;
+    default:        foot = "ПРИГОТОВЬСЯ"; break;
   }
 
-  if (ph == Ph::Input) snprintf(l1, sizeof l1, "STEP %d / %d", inputIdx + 1, len);
-  else                 snprintf(l1, sizeof l1, "LENGTH %d", len);
+  if (ph == Ph::Input) snprintf(l1, sizeof l1, "ШАГ %d / %d", inputIdx + 1, len);
+  else                 snprintf(l1, sizeof l1, "ДЛИНА %d", len);
 
   Ui::solo(c.dpy, name(), right, big, l1, l2, foot);
 }

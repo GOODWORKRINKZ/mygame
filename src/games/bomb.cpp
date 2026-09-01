@@ -130,30 +130,30 @@ void BombGame::render(Ctx& c) {
 }
 
 void BombGame::oled(Ctx& c) {
-  char b1[6], b2[6], s1[12], s2[12], foot[24];
+  char b1[6], b2[6], s1[16], s2[16], foot[32];
   snprintf(b1, sizeof b1, "%d", m.score[0]);
   snprintf(b2, sizeof b2, "%d", m.score[1]);
 
   bool in1 = (pos <= Z1_HI + 0.5f);
   bool in2 = (pos >= Z2_LO - 0.5f);
-  if (c.now < stun[0])      strcpy(s1, "STUNNED");
-  else if (in1)             strcpy(s1, "HIT IT!");
-  else                      strcpy(s1, "wait");
-  if (c.now < stun[1])      strcpy(s2, "STUNNED");
-  else if (in2)             strcpy(s2, "HIT IT!");
-  else                      strcpy(s2, "wait");
+  if (c.now < stun[0])      strcpy(s1, "ОГЛУШЕН");
+  else if (in1)             strcpy(s1, "БЕЙ!");
+  else                      strcpy(s1, "ЖДИ");
+  if (c.now < stun[1])      strcpy(s2, "ОГЛУШЕН");
+  else if (in2)             strcpy(s2, "БЕЙ!");
+  else                      strcpy(s2, "ЖДИ");
 
   uint32_t left = (c.now < fuseEnd) ? (fuseEnd - c.now) : 0;
   int fusePct = (int)((left * 100) / fuseTotal);
 
   Panel l, r;
-  l.name = "GREEN"; l.big = b1; l.sub = s1; l.bar = fusePct; l.active = (m.winner == 1);
-  r.name = "BLUE";  r.big = b2; r.sub = s2; r.bar = fusePct; r.active = (m.winner == 2);
+  l.name = "ЗЕЛЕНЫЙ"; l.big = b1; l.sub = s1; l.bar = fusePct; l.active = (m.winner == 1);
+  r.name = "СИНИЙ";   r.big = b2; r.sub = s2; r.bar = fusePct; r.active = (m.winner == 2);
 
   const char* f = foot;
-  if (m.over())      f = (m.winner == 1) ? "GREEN WINS THE MATCH" : "BLUE WINS THE MATCH";
-  else if (m.winner) f = "BOOM!";
-  else snprintf(foot, sizeof foot, "fuse %lu.%lus  x%d",
+  if (m.over())      f = (m.winner == 1) ? "ЗЕЛЕНЫЙ ПОБЕДИЛ" : "СИНИЙ ПОБЕДИЛ";
+  else if (m.winner) f = "БУМ!";
+  else snprintf(foot, sizeof foot, "ЗАПАЛ %lu.%luС  X%d",
                 (unsigned long)(left / 1000), (unsigned long)((left % 1000) / 100), volleys);
 
   drawMatchOled(c, name(), m, l, r, f);

@@ -168,27 +168,27 @@ void ShooterGame::render(Ctx& c, const Inputs& in) {
 }
 
 void ShooterGame::oled(Ctx& c, const Inputs& in) {
-  char b1[8], b2[8], s1[12], s2[12];
+  char b1[8], b2[8], s1[16], s2[16];
   snprintf(b1, sizeof b1, "%d", hp[0]);
   snprintf(b2, sizeof b2, "%d", hp[1]);
 
   const BtnState* btn[2] = { &in.p1, &in.p2 };
   for (int p = 0; p < 2; p++) {
     char* dst = (p == 0) ? s1 : s2;
-    if (btn[p]->held && btn[p]->heldMs >= CHARGE_FULL_MS) strcpy(dst, "CHARGED!");
-    else if (btn[p]->held)                                strcpy(dst, "charging");
-    else                                                  strcpy(dst, "HP");
+    if (btn[p]->held && btn[p]->heldMs >= CHARGE_FULL_MS) strcpy(dst, "ЗАРЯЖЕН!");
+    else if (btn[p]->held)                                strcpy(dst, "ЗАРЯДКА");
+    else                                                  strcpy(dst, "ОЗ");
   }
 
   Panel l, r;
-  l.name = "GREEN"; l.big = b1; l.sub = s1;
+  l.name = "ЗЕЛЕНЫЙ"; l.big = b1; l.sub = s1;
   l.dots = m.score[0]; l.dotsMax = ROUNDS_TO_WIN; l.active = (m.winner == 1);
-  r.name = "BLUE";  r.big = b2; r.sub = s2;
+  r.name = "СИНИЙ";   r.big = b2; r.sub = s2;
   r.dots = m.score[1]; r.dotsMax = ROUNDS_TO_WIN; r.active = (m.winner == 2);
 
   const char* foot = hint();
-  if (m.over())      foot = (m.winner == 1) ? "GREEN WINS THE MATCH" : "BLUE WINS THE MATCH";
-  else if (m.winner) foot = "base destroyed!";
+  if (m.over())      foot = (m.winner == 1) ? "ЗЕЛЕНЫЙ ПОБЕДИЛ" : "СИНИЙ ПОБЕДИЛ";
+  else if (m.winner) foot = "БАЗА УНИЧТОЖЕНА!";
 
   drawMatchOled(c, name(), m, l, r, foot);
 }

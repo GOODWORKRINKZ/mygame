@@ -74,7 +74,7 @@ void drawCelebration(Ctx& c, int winner, bool matchOver) {
 void drawMatchOled(Ctx& c, const char* title, const Match& m,
                    const Panel& left, const Panel& right, const char* foot) {
   char rnd[10];
-  snprintf(rnd, sizeof rnd, "R%d", m.round);
+  snprintf(rnd, sizeof rnd, "Р%d", m.round);
   Ui::split(c.dpy, title, rnd, left, right, foot);
 }
 
@@ -111,5 +111,5 @@ void Store::wipe() {
 }
 
 const char* playersLabel(uint8_t n) {
-  return n == 1 ? "1P" : "2P";
+  return n == 1 ? "1И" : "2И";
 }

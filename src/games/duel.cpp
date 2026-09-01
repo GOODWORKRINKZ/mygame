@@ -113,30 +113,30 @@ void DuelGame::render(Ctx& c) {
 }
 
 static void rtText(char* dst, size_t n, int v) {
-  if (v == -2)      snprintf(dst, n, "FALSE!");
+  if (v == -2)      snprintf(dst, n, "ФОЛС!");
   else if (v < 0)   snprintf(dst, n, "--");
-  else              snprintf(dst, n, "%dms", v);
+  else              snprintf(dst, n, "%dмс", v);
 }
 
 void DuelGame::oled(Ctx& c) {
-  char b1[6], b2[6], s1[12], s2[12];
+  char b1[6], b2[6], s1[16], s2[16];
   snprintf(b1, sizeof b1, "%d", m.score[0]);
   snprintf(b2, sizeof b2, "%d", m.score[1]);
   rtText(s1, sizeof s1, rt[0]);
   rtText(s2, sizeof s2, rt[1]);
 
   Panel l, r;
-  l.name = "GREEN"; l.big = b1; l.sub = s1;
+  l.name = "ЗЕЛЕНЫЙ"; l.big = b1; l.sub = s1;
   l.dots = m.score[0]; l.dotsMax = ROUNDS_TO_WIN; l.active = (m.winner == 1);
-  r.name = "BLUE";  r.big = b2; r.sub = s2;
+  r.name = "СИНИЙ";   r.big = b2; r.sub = s2;
   r.dots = m.score[1]; r.dotsMax = ROUNDS_TO_WIN; r.active = (m.winner == 2);
 
-  const char* foot = "wait for the flash!";
-  if (m.over())          foot = (m.winner == 1) ? "GREEN WINS THE MATCH" : "BLUE WINS THE MATCH";
-  else if (falseStart)   foot = "FALSE START!";
-  else if (m.winner)     foot = "fastest finger wins";
-  else if (ph == Ph::Arming) foot = "get ready...";
-  else if (ph == Ph::Go) foot = "GO GO GO!";
+  const char* foot = "ЖДИ ВСПЫШКУ!";
+  if (m.over())          foot = (m.winner == 1) ? "ЗЕЛЕНЫЙ ПОБЕДИЛ" : "СИНИЙ ПОБЕДИЛ";
+  else if (falseStart)   foot = "ФАЛЬСТАРТ!";
+  else if (m.winner)     foot = "ПОБЕДА ЗА СКОРОСТЬ";
+  else if (ph == Ph::Arming) foot = "ПРИГОТОВЬСЯ...";
+  else if (ph == Ph::Go) foot = "СТАРТ!";
 
   drawMatchOled(c, name(), m, l, r, foot);
 }

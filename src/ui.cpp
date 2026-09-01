@@ -122,8 +122,8 @@ void menuFrame(Display& d, const char* title, const char* const* items,
     if (cur) d.gfx().fillRect(0, y - 1, OLED_WIDTH, 10, SSD1306_WHITE);
     d.gfx().setTextColor(cur ? SSD1306_BLACK : SSD1306_WHITE);
 
-    char tag[4];
-    snprintf(tag, sizeof tag, "%dP", playerCounts ? playerCounts[idx] : 2);
+    char tag[6];
+    snprintf(tag, sizeof tag, "%dИ", playerCounts ? playerCounts[idx] : 2);
     d.text(2, y, cur ? ">" : " ", 1);
     d.text(10, y, items[idx], 1);
     d.text(OLED_WIDTH - 14, y, tag, 1);
@@ -138,19 +138,19 @@ void bootFrame(Display& d, uint8_t phase, uint8_t progress) {
   d.clear();
   if (phase == 0) {
     d.textCentered(6, "LED", 3);
-    d.textCentered(30, "ARCADE", 2);
+    d.textCentered(30, "АРКАДА", 2);
     bar(d, 14, 50, OLED_WIDTH - 28, 8, progress);
   } else if (phase == 1) {
-    d.textCentered(10, "READY", 3);
-    d.textCentered(38, "32 pixels of fun", 1);
+    d.textCentered(10, "ГОТОВ", 3);
+    d.textCentered(38, "32 ПИКСЕЛЯ ВЕСЕЛЬЯ", 1);
     for (uint8_t i = 0; i < 8; i++)
       d.gfx().fillCircle(8 + i * 16, 56, 3, SSD1306_WHITE);
   } else {
-    d.textCentered(4, "CONTROLS", 1);
-    d.text(2, 16, "GREEN  = player 1", 1);
-    d.text(2, 26, "BLUE   = player 2", 1);
-    d.text(2, 36, "MENU   = select", 1);
-    d.text(2, 46, "HOLD   = back/restart", 1);
+    d.textCentered(4, "УПРАВЛЕНИЕ", 1);
+    d.text(2, 16, "ЗЕЛЕНАЯ = ИГРОК 1", 1);
+    d.text(2, 26, "СИНЯЯ = ИГРОК 2", 1);
+    d.text(2, 36, "МЕНЮ = ВЫБОР", 1);
+    d.text(2, 46, "УДЕРЖ = НАЗАД/РЕСТАРТ", 1);
   }
   d.flushNow();
 }
