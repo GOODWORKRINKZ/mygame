@@ -2,178 +2,266 @@
 #include "esp_system.h"
 #include "config.h"
 #include "hardware.h"
+#include "fx.h"
+#include "ui.h"
+#include "game.h"
 #include "games.h"
 #include "log.h"
 
-LedStrip   leds;
-Display    dpy;
-Output     out;
-Button     btnP1, btnP2, btnMenu;
+// ============================================================
+//  LED ARCADE — точка входа
+// ============================================================
+//  Устройство живёт в трёх состояниях:
+//    Boot — заставка при включении;
+//    Menu — выбор игры (зелёная/синяя листают, MENU запускает);
+//    Play — идёт игра (MENU выходит, удержание MENU перезапускает).
+//
+//  Кадр фиксированный (FRAME_MS), но кнопки опрашиваются в каждом
+//  проходе loop() и фронты "защёлкиваются" — иначе быстрые нажатия
+//  между кадрами терялись бы.
+
+LedStrip    leds;
+Display     dpy;
+Output      out;
+Fx          fx;
+Button      btnP1, btnP2, btnMenu;
 GameManager manager;
 
+enum class AppState : uint8_t { Boot, Menu, Play };
+static AppState state = AppState::Boot;
+
+static uint32_t lastFrame = 0;
+static uint32_t lastInput = 0;      // для "заставки" в простое
+static bool     menuLongUsed = false;
+
+// ---- защёлки фронтов между кадрами ----
+struct Latch {
+  bool     pressed = false;
+  bool     released = false;
+  uint32_t lastHeld = 0;
+};
+static Latch latchP1, latchP2, latchMenu;
+
+static void pollButton(Button& b, Latch& l) {
+  b.update();
+  if (b.pressed())  l.pressed = true;
+  if (b.released()) { l.released = true; l.lastHeld = b.lastHeldMs(); }
+}
+
+static void fillBtn(BtnState& s, Button& b, Latch& l) {
+  s.pressed    = l.pressed;
+  s.released   = l.released;
+  s.held       = b.held();
+  s.heldMs     = b.heldMs();
+  s.lastHeldMs = l.lastHeld;
+  l.pressed = l.released = false;
+}
+
 static void playBootAnimation();
+static void enterMenu();
+static void enterPlay();
+static void updateMenu(const Inputs& in, Ctx& c);
+static void runDiagnostics();
 
-// Глобальное имя текущей игры — для heartbeat и для лога кнопок.
-static const char* g_currentGame = "?";
-
+// ============================================================
+//  setup
+// ============================================================
 void setup() {
-  // Serial уже инициализирован platformio/Arduino, но на USB-CDC
-  // первый printf иногда теряется — даём шине 200 мс подняться.
   Serial.begin(115200);
   delay(200);
 
-  LOG_I("BOOT", "===== LED ARCADE BOOT =====");
-  LOG_I("BOOT", "ESP32-C3, CPU %u MHz, flash %u, free heap %u",
-         ESP.getCpuFreqMHz(), ESP.getFlashChipSize(), ESP.getFreeHeap());
-  LOG_I("BOOT", "pinout: LED=%d OLED SDA/SCL=%d/%d BTN=%d/%d/%d BUZZ=%d VIBRO=%d",
-         PIN_LED, PIN_OLED_SDA, PIN_OLED_SCL,
-         PIN_BTN_P1, PIN_BTN_P2, PIN_BTN_MENU, PIN_BUZZER, PIN_VIBRO);
+  LOG_I("BOOT", "===== LED ARCADE =====");
+  LOG_I("BOOT", "ESP32-C3 @%u MHz, flash %u, heap %u",
+        ESP.getCpuFreqMHz(), ESP.getFlashChipSize(), ESP.getFreeHeap());
+  LOG_I("BOOT", "pins: LED=%d I2C=%d/%d BTN=%d/%d/%d BUZZ=%d VIBRO=%d",
+        PIN_LED, PIN_OLED_SDA, PIN_OLED_SCL,
+        PIN_BTN_P1, PIN_BTN_P2, PIN_BTN_MENU, PIN_BUZZER, PIN_VIBRO);
 
   randomSeed(esp_random());
 
-  LOG_I("INIT", "leds.begin()...");
   leds.begin();
-  LOG_I("INIT", "leds LUT built: %d logical -> physical", LED_COUNT);
-  LOG_I("INIT", "NeoPixel pin=%d brightness=%d/255 color order=GRB",
-         PIN_LED, LED_BRIGHTNESS);
-
-  // ====== ЖЁСТКАЯ ДИАГНОСТИКА DATA-ПИНА =============================
-  // Дёрнем пин как обычный GPIO (HIGH/LOW), чтобы на осциллографе или
-  // логическом анализаторе было видно, что сигнал действительно идёт.
-  // На самой ленте это не отразится (WS2812 ждёт специальный протокол),
-  // но если на этом пине висит обычный светодиод — увидишь мигание.
-  LOG_I("LED", "GPIO %d raw blink test (5 pulses, 200ms)...", PIN_LED);
-  pinMode(PIN_LED, OUTPUT);
-  for (int i = 0; i < 5; i++) {
-    digitalWrite(PIN_LED, HIGH);
-    delay(100);
-    digitalWrite(PIN_LED, LOW);
-    delay(100);
-  }
-  LOG_I("LED", "GPIO %d blink done, handing pin to NeoPixel", PIN_LED);
-  // ==================================================================
-
-  // ====== ДИАГНОСТИКА ЛЕНТЫ =========================================
-  // Зажигаем все 32 пикселя по очереди: RED, GREEN, BLUE, WHITE.
-  // Если лента жива — увидишь последовательно 4 цвета по 500 мс каждый.
-  // Если нет — проверь: 1) питание 5V, 2) общий GND, 3) DATA на GPIO10,
-  // 4) резистор 330-470 Ом между GPIO10 и DIN, 5) яркость в config.h.
-  LOG_I("LED", "starting color test on strip...");
-  leds.colorTest();
-  LOG_I("LED", "color test done");
-
-  // Бегущий огонёк по логическим индексам 0..31 — позволяет понять,
-  // какие пиксели физически работают и в каком порядке.
-  LOG_I("LED", "starting oneByOne test (4 seconds)...");
-  leds.oneByOneTest();
-  // ==================================================================
-
-  LOG_I("INIT", "dpy.begin() (OLED 128x64 I2C 0x%02X)...", OLED_ADDR);
   dpy.begin();
-  LOG_I("INIT", "dpy OK");
-
-  LOG_I("INIT", "out.begin() (buzzer pin=%d, vibro pin=%d)...", PIN_BUZZER, PIN_VIBRO);
   out.begin();
+  store.begin();
+  fx.reset();
 
-  LOG_I("INIT", "buttons.begin()...");
   btnP1.begin(PIN_BTN_P1);
   btnP2.begin(PIN_BTN_P2);
   btnMenu.begin(PIN_BTN_MENU);
-  LOG_I("BTN", "raw levels P1=%d P2=%d MENU=%d (1=released, 0=pressed)",
-         digitalRead(PIN_BTN_P1), digitalRead(PIN_BTN_P2), digitalRead(PIN_BTN_MENU));
+  LOG_I("BTN", "idle levels P1=%d P2=%d MENU=%d (1=released)",
+        digitalRead(PIN_BTN_P1), digitalRead(PIN_BTN_P2), digitalRead(PIN_BTN_MENU));
 
-  manager.resetCurrent();
-  g_currentGame = manager.now()->name();
-  LOG_I("BOOT", "starting game: %s", g_currentGame);
+#if DIAG_ON_BOOT
+  runDiagnostics();
+#endif
 
   playBootAnimation();
-  LOG_I("BOOT", "boot animation done, entering main loop");
+  enterMenu();
+  lastFrame = millis();
+  LOG_I("BOOT", "ready, %d games", manager.count());
 }
 
 // ============================================================
-//  Заставка при включении: бегущая радуга + проверка LUT +
-//  прогресс-бар на OLED + короткий "фанфары" бузером/вибрацией.
+//  Заставка при включении
 // ============================================================
 static void playBootAnimation() {
-  // 1) Звуковое приветствие (неблокирующе — крутится в loop через out.update).
-  out.startupFanfare();
+  out.sfx(Sfx::Fanfare);
 
-  // 2) Анимация на ленте: бегущая "комета" + хвост-радуга (~1.6 сек).
-  const uint32_t STEP_MS = 22;
-  const uint8_t  LEN = LED_COUNT;
+  // Комета с радужным хвостом пробегает ленту три раза.
+  const uint8_t TAIL = 8;
   for (int pass = 0; pass < 3; pass++) {
-    for (int i = -8; i < (int)LEN; i++) {
+    for (int i = -TAIL; i < LED_COUNT; i++) {
       leds.clear();
-      for (int k = 0; k < 8; k++) {
+      for (int k = 0; k < TAIL; k++) {
         int p = i - k;
-        if (p < 0 || p >= LEN) continue;
-        // хвост плавно затухает, голова — белая
-        uint8_t v = (uint8_t)(40 + (215 * (8 - k)) / 8);
-        leds.setLogical(p, leds.hsv((uint16_t)(i * 14 + k * 30), 255, v));
+        if (p < 0 || p >= LED_COUNT) continue;
+        uint8_t v = (uint8_t)(35 + (220 * (TAIL - k)) / TAIL);
+        leds.set(p, colHsv((uint8_t)(i * 6 + k * 12), 255, v));
       }
       leds.show();
-      dpy.bootFrame(0);
-      delay(STEP_MS);
+      out.update();
+      uint8_t prog = (uint8_t)(((pass * LED_COUNT + i + TAIL) * 100) / (3 * LED_COUNT));
+      Ui::bootFrame(dpy, 0, prog);
+      delay(16);
     }
   }
 
-  // 3) "Все онлайн" — заливка ленты цветом команды + финальный кадр OLED.
-  leds.fillAll(leds.rgb(0, 120, 0));
+  leds.fillAll(rgb(0, 90, 30));
   leds.show();
-  dpy.bootFrame(1);
-  delay(700);
+  Ui::bootFrame(dpy, 1, 100);
+  delay(600);
 
-  // 4) Список игр на OLED и переход к первой.
-  leds.fillAll(0);
+  leds.clear();
   leds.show();
-  dpy.bootFrame(2);
-  delay(900);
-
-  dpy.splash(manager.now()->name(), "MENU: switch game");
+  Ui::bootFrame(dpy, 2, 100);
+  delay(1400);
 }
 
+// ============================================================
+//  Диагностика ленты (доступна из меню долгим нажатием MENU)
+// ============================================================
+static void runDiagnostics() {
+  LOG_I("DIAG", "strip diagnostics start");
+  dpy.clear();
+  dpy.textCentered(20, "LED TEST", 2);
+  dpy.textCentered(44, "R G B W + scan", 1);
+  dpy.flushNow();
+  leds.colorTest();
+  leds.oneByOneTest();
+  LOG_I("DIAG", "strip diagnostics done");
+}
+
+// ============================================================
+//  Переходы между состояниями
+// ============================================================
+static void enterMenu() {
+  state = AppState::Menu;
+  fx.reset();
+  out.silence();
+  lastInput = millis();
+  LOG_I("APP", "menu, cursor on %s", manager.now()->name());
+}
+
+static void enterPlay() {
+  state = AppState::Play;
+  fx.reset();
+  manager.resetCurrent();
+  LOG_I("APP", "start %s (%dP)", manager.now()->name(), manager.now()->players());
+}
+
+// ============================================================
+//  Меню выбора игры
+// ============================================================
+static void updateMenu(const Inputs& in, Ctx& c) {
+  Game* g = manager.now();
+
+  // ---- лента: превью выбранной игры ----
+  bool idle = (c.now - lastInput) > 15000;
+  c.leds.clear();
+  if (idle) {
+    // режим "витрины" — просто красивая радуга
+    Bg::rainbow(c.leds, c.now, 30, 70);
+  } else {
+    Color th = g->theme();
+    Bg::comet(c.leds, c.now, th, 1400, 8);
+    // сколько игроков: 1 или 2 ярких пикселя по краям
+    c.leds.add(0, colScale(COL_P1, 160));
+    if (g->players() == 2) c.leds.add(LED_COUNT - 1, colScale(COL_P2, 160));
+  }
+
+  // ---- OLED: список ----
+  char foot[26];
+  snprintf(foot, sizeof foot, "MENU=play  HOLD=test");
+  Ui::menuFrame(c.dpy, "SELECT GAME", manager.names(), manager.playerCounts(),
+                manager.count(), manager.index(), foot);
+}
+
+// ============================================================
+//  loop
+// ============================================================
 void loop() {
-  btnP1.update();
-  btnP2.update();
-  btnMenu.update();
+  // Кнопки и звук обслуживаем на максимальной частоте: так не теряются
+  // короткие нажатия и не рвутся мелодии.
+  pollButton(btnP1, latchP1);
+  pollButton(btnP2, latchP2);
+  pollButton(btnMenu, latchMenu);
+  out.update();
 
-  // Маленькая кнопка: короткое нажатие — следующая игра,
-  // долгое нажатие — сброс текущей игры.
-  if (btnMenu.longPress()) {
-    manager.resetCurrent();
-    g_currentGame = manager.now()->name();
-    LOG_I("MENU", "RESET -> %s", g_currentGame);
-    dpy.splash(g_currentGame, "reset!");
-  } else if (btnMenu.pressed()) {
-    manager.next();
-    manager.resetCurrent();
-    g_currentGame = manager.now()->name();
-    LOG_I("MENU", "switch -> %s", g_currentGame);
-    dpy.splash(g_currentGame, "MENU: switch game");
-  }
+  uint32_t now = millis();
+  if (now - lastFrame < FRAME_MS) return;
 
-  // Лог нажатий игровых кнопок — только фронты, чтобы не засорять.
-  if (btnP1.pressed()) LOG_D("BTN", "P1 press");
-  if (btnP2.pressed()) LOG_D("BTN", "P2 press");
-  if (btnMenu.pressed()) LOG_V("BTN", "MENU press (handled above)");
-
-  // Heartbeat: каждые 5 секунд показываем, что живы и какая игра активна.
-  static uint32_t lastBeat = 0;
-  if (millis() - lastBeat >= 5000) {
-    lastBeat = millis();
-    LOG_I("HB", "uptime=%lus game=%s heap=%u",
-          (unsigned long)(millis() / 1000), g_currentGame, ESP.getFreeHeap());
-  }
+  uint32_t dtMs = now - lastFrame;
+  if (dtMs > 100) dtMs = 100;          // после блокирующих пауз не «телепортируемся»
+  lastFrame = now;
 
   Inputs in;
-  in.p1Pressed  = btnP1.pressed();
-  in.p1Released = btnP1.released();
-  in.p1Held     = btnP1.held();
-  in.p2Pressed  = btnP2.pressed();
-  in.p2Released = btnP2.released();
-  in.p2Held     = btnP2.held();
+  fillBtn(in.p1, btnP1, latchP1);
+  fillBtn(in.p2, btnP2, latchP2);
+  fillBtn(in.menu, btnMenu, latchMenu);
 
-  manager.now()->update(0, in, leds, dpy, out);
-  out.update();
+  if (in.p1.pressed || in.p2.pressed || in.menu.pressed) lastInput = now;
+
+  Ctx c{ now, dtMs, dtMs / 1000.0f, leds, dpy, out, fx };
+
+  // ---- маленькая кнопка: короткое нажатие по отпусканию,
+  //      длинное — сразу по достижении порога ----
+  bool menuShort = false, menuLong = false;
+  if (btnMenu.longPress()) { menuLong = true; menuLongUsed = true; }
+  if (in.menu.released)    { menuShort = !menuLongUsed; menuLongUsed = false; }
+
+  switch (state) {
+    case AppState::Menu:
+      if (in.p1.pressed || btnP1.repeat()) { manager.prev(); out.sfx(Sfx::Click); }
+      if (in.p2.pressed || btnP2.repeat()) { manager.next(); out.sfx(Sfx::Click); }
+      if (menuShort) { out.sfx(Sfx::Select); enterPlay(); break; }
+      if (menuLong)  { runDiagnostics(); lastFrame = millis(); }
+      updateMenu(in, c);
+      break;
+
+    case AppState::Play:
+      if (menuShort) { out.sfx(Sfx::Back); enterMenu(); break; }
+      if (menuLong)  { out.sfx(Sfx::Select); manager.resetCurrent(); fx.reset(); }
+      manager.now()->update(in, c);
+      break;
+
+    default:
+      enterMenu();
+      break;
+  }
+
+  // Эффекты рисуются поверх кадра игры — так искры и вспышки
+  // не мешают игровой логике и работают одинаково во всех играх.
+  fx.update(c.dt);
+  fx.draw(leds);
   leds.show();
+
+  // Сердцебиение в лог: видно, что живы и где находимся.
+  static uint32_t lastBeat = 0;
+  if (now - lastBeat >= 10000) {
+    lastBeat = now;
+    LOG_I("HB", "up=%lus state=%s game=%s heap=%u",
+          (unsigned long)(now / 1000),
+          state == AppState::Menu ? "menu" : "play",
+          manager.now()->name(), ESP.getFreeHeap());
+  }
 }
