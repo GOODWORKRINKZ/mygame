@@ -17,11 +17,18 @@
 #define PIN_VIBRO       6   // вибромоторчик (через транзистор)
 
 // ---------------- Светодиодная лента ----------------
-#define LED_COUNT       32
+// Размеры ленты и карта "логический -> физический" живут в led_map.h:
+// оттуда приходят LED_PHYSICAL_COUNT, LED_COUNT и цвет стен WALL_*.
+#include "led_map.h"
+
 #define LED_BRIGHTNESS  80        // 0..255 глобальная яркость
 #define LED_GAMMA       1         // 1 = гамма-коррекция (плавные затухания)
-#define MIDDLE_LO       8         // средняя зона: 16 светодиодов [8..23]
-#define MIDDLE_HI       23
+
+// Средняя зона (нужна перетягиванию каната) — всегда по центру поля,
+// какой бы длины оно ни получилось.
+#define MIDDLE_LEN      16
+#define MIDDLE_LO       ((LED_COUNT - MIDDLE_LEN) / 2)
+#define MIDDLE_HI       (MIDDLE_LO + MIDDLE_LEN - 1)
 
 // ---------------- Тайминги движка ----------------
 #define FRAME_MS        16        // ~60 кадров/с на ленте

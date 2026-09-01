@@ -77,6 +77,10 @@ void setup() {
         PIN_LED, PIN_OLED_SDA, PIN_OLED_SCL,
         PIN_BTN_P1, PIN_BTN_P2, PIN_BTN_MENU, PIN_BUZZER, PIN_VIBRO);
 
+  LOG_I("BOOT", "field: physical=%d logical=%d walls=%d middle=[%d..%d]",
+        LED_PHYSICAL_COUNT, LED_COUNT, LED_PHYSICAL_COUNT - LED_COUNT,
+        MIDDLE_LO, MIDDLE_HI);
+
   randomSeed(esp_random());
 
   leds.begin();
@@ -142,12 +146,34 @@ static void playBootAnimation() {
 // ============================================================
 static void runDiagnostics() {
   LOG_I("DIAG", "strip diagnostics start");
+  char l1[26], l2[26];
+  snprintf(l1, sizeof l1, "PHYS %d  GAME %d", LED_PHYSICAL_COUNT, LED_COUNT);
+  snprintf(l2, sizeof l2, "walls %d", LED_PHYSICAL_COUNT - LED_COUNT);
+
+  // 1) цвета по всей физической ленте — жива ли она вообще
   dpy.clear();
-  dpy.textCentered(20, "LED TEST", 2);
-  dpy.textCentered(44, "R G B W + scan", 1);
+  dpy.textCentered(6, "LED TEST", 2);
+  dpy.textCentered(30, "1/3 colors (phys)", 1);
+  dpy.textCentered(44, l1, 1);
   dpy.flushNow();
   leds.colorTest();
+
+  // 2) бегущий пиксель по физическим номерам — для сборки карты
+  dpy.clear();
+  dpy.textCentered(6, "LED TEST", 2);
+  dpy.textCentered(30, "2/3 scan physical", 1);
+  dpy.textCentered(44, "pink = wall", 1);
+  dpy.flushNow();
+  leds.physicalScanTest();
+
+  // 3) бегущий пиксель по логическим номерам — проверка карты
+  dpy.clear();
+  dpy.textCentered(6, "LED TEST", 2);
+  dpy.textCentered(30, "3/3 scan logical", 1);
+  dpy.textCentered(44, l2, 1);
+  dpy.flushNow();
   leds.oneByOneTest();
+
   LOG_I("DIAG", "strip diagnostics done");
 }
 
@@ -165,6 +191,7 @@ static void enterMenu() {
 static void enterPlay() {
   state = AppState::Play;
   fx.reset();
+  leds.resetWall();          // меню подкрашивает стены — возвращаем как было
   manager.resetCurrent();
   LOG_I("APP", "start %s (%dP)", manager.now()->name(), manager.now()->players());
 }
@@ -179,9 +206,12 @@ static void updateMenu(const Inputs& in, Ctx& c) {
   bool idle = (c.now - lastInput) > 15000;
   c.leds.clear();
   if (idle) {
-    // режим "витрины" — просто красивая радуга
+    // режим "витрины" — радуга и по полю, и по стенам
     Bg::rainbow(c.leds, c.now, 30, 70);
+    c.leds.setWall(colHsv((uint8_t)((c.now * 30) / 1000), 255, 40));
   } else {
+    // стены дышат цветом выбранной игры — видно, что курсор двигается
+    c.leds.setWall(colScale(g->theme(), (uint8_t)(14 + sin8((uint8_t)(c.now / 8)) / 8)));
     Color th = g->theme();
     Bg::comet(c.leds, c.now, th, 1400, 8);
     // сколько игроков: 1 или 2 ярких пикселя по краям

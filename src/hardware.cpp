@@ -78,14 +78,44 @@ static void buildGamma() {
 
 void LedStrip::begin() {
   buildGamma();
-  map.build(PANELS, PANEL_COUNT);
+
+  // Обратная карта: физический -> логический. Всё, что не встретилось
+  // в LED_LOGICAL_MAP, остаётся NO_LOGICAL и станет "стеной".
+  for (int p = 0; p < LED_PHYSICAL_COUNT; p++) _phys2log[p] = NO_LOGICAL;
+  int walls = LED_PHYSICAL_COUNT;
+  for (int l = 0; l < LED_COUNT; l++) {
+    uint8_t p = LED_LOGICAL_MAP[l];
+    if (p >= LED_PHYSICAL_COUNT) {
+      LOG_E("LED", "map[%d] = %u выходит за LED_PHYSICAL_COUNT=%d", l, p, LED_PHYSICAL_COUNT);
+      continue;
+    }
+    if (_phys2log[p] != NO_LOGICAL)
+      LOG_W("LED", "физический %u указан в карте дважды (логические %u и %d)",
+            p, _phys2log[p], l);
+    else
+      walls--;
+    _phys2log[p] = (uint8_t)l;
+  }
+
+  resetWall();
   _strip.begin();
   _strip.setBrightness(LED_BRIGHTNESS);
   _strip.clear();
   _strip.show();
   clear();
-  LOG_I("LED", "strip ready: pin=%d count=%d WS2812 GRB@800kHz gamma=%d",
-        PIN_LED, LED_COUNT, (int)LED_GAMMA);
+  LOG_I("LED", "strip ready: pin=%d physical=%d logical=%d walls=%d gamma=%d",
+        PIN_LED, LED_PHYSICAL_COUNT, LED_COUNT, walls, (int)LED_GAMMA);
+}
+
+void LedStrip::resetWall() { _wall = rgb(WALL_R, WALL_G, WALL_B); }
+
+uint8_t LedStrip::physicalOf(int logical) const {
+  return (logical >= 0 && logical < LED_COUNT) ? LED_LOGICAL_MAP[logical] : 0;
+}
+
+bool LedStrip::isWall(int physical) const {
+  return (physical < 0 || physical >= LED_PHYSICAL_COUNT)
+         || _phys2log[physical] == NO_LOGICAL;
 }
 
 void LedStrip::clear() {
@@ -138,39 +168,69 @@ Color LedStrip::get(int l) const {
   return (l < 0 || l >= LED_COUNT) ? 0 : _buf[l];
 }
 
-void LedStrip::show() {
-  for (int l = 0; l < LED_COUNT; l++) {
-    Color c = _buf[l];
+void LedStrip::rawPixel(int physical, Color c) {
+  if (physical < 0 || physical >= LED_PHYSICAL_COUNT) return;
 #if LED_GAMMA
-    _strip.setPixelColor(map[l], GAMMA8[colR(c)], GAMMA8[colG(c)], GAMMA8[colB(c)]);
+  _strip.setPixelColor(physical, GAMMA8[colR(c)], GAMMA8[colG(c)], GAMMA8[colB(c)]);
 #else
-    _strip.setPixelColor(map[l], colR(c), colG(c), colB(c));
+  _strip.setPixelColor(physical, colR(c), colG(c), colB(c));
 #endif
+}
+
+void LedStrip::rawFill(Color c) {
+  for (int p = 0; p < LED_PHYSICAL_COUNT; p++) rawPixel(p, c);
+}
+
+void LedStrip::show() {
+  // Один проход по физической ленте: игровые пиксели берём из кадра,
+  // всё остальное заливаем цветом стен.
+  for (int p = 0; p < LED_PHYSICAL_COUNT; p++) {
+    uint8_t l = _phys2log[p];
+    rawPixel(p, (l == NO_LOGICAL) ? _wall : _buf[l]);
   }
   _strip.show();
 }
 
 void LedStrip::colorTest() {
+  // Проверка железа: гоняем цвета по ВСЕЙ физической ленте, мимо карты.
   const Color colors[] = { rgb(255,0,0), rgb(0,255,0), rgb(0,0,255), rgb(255,255,255) };
   const char* names[]  = { "RED", "GREEN", "BLUE", "WHITE" };
   for (int c = 0; c < 4; c++) {
-    LOG_I("LED", "color test: %s on all %d pixels", names[c], LED_COUNT);
-    fillAll(colors[c]);
-    show();
+    LOG_I("LED", "color test: %s on all %d physical pixels", names[c], LED_PHYSICAL_COUNT);
+    rawFill(colors[c]);
+    _strip.show();
     delay(450);
   }
-  clear();
-  show();
+  rawFill(0);
+  _strip.show();
   delay(150);
 }
 
+void LedStrip::physicalScanTest() {
+  // Бежим по ФИЗИЧЕСКИМ номерам: именно этот прогон нужен, чтобы
+  // записать порядок светодиодов и собрать LED_LOGICAL_MAP.
+  LOG_I("LED", "physical scan: 0..%d", LED_PHYSICAL_COUNT - 1);
+  for (int p = 0; p < LED_PHYSICAL_COUNT; p++) {
+    rawFill(0);
+    // стены подсвечиваем своим цветом — сразу видно, какие выпадают из игры
+    rawPixel(p, isWall(p) ? rgb(255, 0, 160) : rgb(255, 90, 0));
+    _strip.show();
+    LOG_V("LED", "physical=%d %s", p, isWall(p) ? "WALL" : "game");
+    delay(110);
+  }
+  rawFill(0);
+  _strip.show();
+}
+
 void LedStrip::oneByOneTest() {
-  LOG_I("LED", "oneByOne: logical 0..%d", LED_COUNT - 1);
+  // Бежим по ЛОГИЧЕСКИМ номерам: огонёк должен идти ровно так,
+  // как ты хочешь видеть игровое поле. Стены при этом горят своим цветом.
+  LOG_I("LED", "logical scan: 0..%d", LED_COUNT - 1);
   for (int i = 0; i < LED_COUNT; i++) {
     clear();
-    set(i, rgb(255, 90, 0));
+    set(i, rgb(0, 255, 120));
     show();
-    LOG_V("LED", "logical=%d -> physical=%u", i, (unsigned)map[i]);
+    LOG_V("LED", "logical=%d -> physical=%u", i, (unsigned)physicalOf(i));
     delay(110);
   }
   clear();

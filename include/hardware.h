@@ -42,12 +42,15 @@ uint8_t tri8(uint8_t theta);
 #define COL_NEUTRAL   rgb(40, 40, 46)
 
 // ============================================================
-//  Лента: кадровый буфер + логическая адресация (поверх LedMap)
+//  Лента: логический кадровый буфер поверх физической ленты
+// ============================================================
+//  Игры работают только с логическими индексами 0..LED_COUNT-1.
+//  При выводе кадра каждый логический пиксель уходит на свой
+//  физический адрес из LED_LOGICAL_MAP, а физические светодиоды,
+//  которых в таблице нет, заливаются цветом стен.
 // ============================================================
 class LedStrip {
 public:
-  LedMap map;
-
   void begin();
 
   // ---- работа с кадром ----
@@ -64,17 +67,32 @@ public:
 
   Color get(int logical) const;
 
+  // ---- карта ----
+  uint8_t physicalOf(int logical) const;        // логический -> физический
+  bool    isWall(int physical) const;           // этот физический вне игры?
+  void    setWall(Color c) { _wall = c; }       // перекрасить стены
+  Color   wall() const { return _wall; }
+  void    resetWall();                          // вернуть цвет из led_map.h
+
   // Совместимость со старым кодом
   Color rgb(uint8_t r, uint8_t g, uint8_t b) const { return ::rgb(r, g, b); }
   Color hsv(uint8_t h, uint8_t s = 255, uint8_t v = 255) const { return colHsv(h, s, v); }
 
   // ---- диагностика ----
-  void colorTest();     // R / G / B / W на всей ленте
-  void oneByOneTest();  // бегущий одиночный пиксель по логическим индексам
+  void colorTest();          // R/G/B/W по всей ФИЗИЧЕСКОЙ ленте (проверка железа)
+  void physicalScanTest();   // бегущий пиксель по ФИЗИЧЕСКИМ номерам (сбор карты)
+  void oneByOneTest();       // бегущий пиксель по ЛОГИЧЕСКИМ номерам (проверка карты)
 
 private:
-  Color _buf[LED_COUNT];
-  Adafruit_NeoPixel _strip{LED_COUNT, PIN_LED, NEO_GRB + NEO_KHZ800};
+  static const uint8_t NO_LOGICAL = 0xFF;
+
+  void rawPixel(int physical, Color c);   // напрямую в ленту, мимо карты
+  void rawFill(Color c);
+
+  Color   _buf[LED_COUNT];                     // логический кадр
+  Color   _wall = 0;                           // цвет стен
+  uint8_t _phys2log[LED_PHYSICAL_COUNT];       // физический -> логический (или NO_LOGICAL)
+  Adafruit_NeoPixel _strip{LED_PHYSICAL_COUNT, PIN_LED, NEO_GRB + NEO_KHZ800};
 };
 
 // ============================================================
