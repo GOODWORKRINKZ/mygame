@@ -12,6 +12,19 @@ public:
   const char* name() const override { return "КАНАТ"; }
   const char* hint() const override { return "ДОЛБИ! ВЫШИБИ ИЗ ЗОНЫ"; }
   Color theme() const override { return rgb(255, 120, 0); }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "2 ИГРОКА",
+      "ЖМИ КНОПКУ ЧАЩЕ",
+      "ТЯНЕШЬ УЗЕЛ К СЕБЕ",
+      "ЧАСТО ЖМИ = КОМБО",
+      "ВЫШИБИ УЗЕЛ ЗА КРАЙ",
+      "СРЕДНЕЙ ЗОНЫ",
+      "ЭТО ПОБЕДА В РАУНДЕ",
+      "МАТЧ ДО 3 ПОБЕД",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
 
@@ -44,6 +57,17 @@ public:
   const char* name() const override { return "СТРЕЛОК"; }
   const char* hint() const override { return "ТАП=ОГОНЬ УДЕРЖ=ЗАРЯД"; }
   Color theme() const override { return rgb(255, 40, 40); }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "2 ИГРОКА",
+      "ТАП = ВЫСТРЕЛ",
+      "УДЕРЖИ = ЗАРЯД",
+      "ЗАРЯД ПРОБЬЕТ ВРАГА",
+      "СБЕЙ ВСЕ ЖИЗНИ ВРАГА",
+      "МАТЧ ДО 3 ПОБЕД",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
 
@@ -84,6 +108,18 @@ public:
   const char* name() const override { return "ПОНГ"; }
   const char* hint() const override { return "ДЕРЖИ ЗАРЯД, ОТПУСТИ"; }
   Color theme() const override { return rgb(0, 220, 220); }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "2 ИГРОКА",
+      "ДЕРЖИ = ЗАРЯД",
+      "ОТПУСТИ = УДАР",
+      "ПОПАДИ ПО МЯЧУ",
+      "ЗАРЯД - СКОРОСТЬ",
+      "ПРОПУСК = ОЧКО ВРАГУ",
+      "МАТЧ ДО 3 ПОБЕД",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
 
@@ -112,6 +148,16 @@ public:
   const char* name() const override { return "ДУЭЛЬ"; }
   const char* hint() const override { return "ЖДИ ВСПЫШКУ!"; }
   Color theme() const override { return rgb(255, 255, 255); }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "2 ИГРОКА",
+      "ЖДИ ВСПЫШКУ",
+      "ЖМИ БЫСТРЕЕ ВСЕХ",
+      "РАНЬШЕ = ПРОИГРЫШ",
+      "МАТЧ ДО 3 ПОБЕД",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
 
@@ -139,6 +185,16 @@ public:
   const char* name() const override { return "СПРИНТ"; }
   const char* hint() const override { return "БЕГИ ДО КРАЯ"; }
   Color theme() const override { return rgb(255, 220, 0); }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "2 ИГРОКА",
+      "ЖМИ ДЛЯ РЫВКА",
+      "РИТМ ВАЖНЕЕ СИЛЫ",
+      "ДОБЕГИ ПЕРВЫМ",
+      "МАТЧ ДО 3 ПОБЕД",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
 
@@ -165,6 +221,17 @@ public:
   const char* name() const override { return "БОМБА"; }
   const char* hint() const override { return "ОТБЕЙ В СВОЕЙ ЗОНЕ"; }
   Color theme() const override { return rgb(255, 60, 0); }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "2 ИГРОКА",
+      "ОТБЕЙ БОМБУ В ЗОНЕ",
+      "КАЖДЫЙ ОТБОЙ БЫСТРЕЕ",
+      "ПРОПУСК ИЛИ ВЗРЫВ",
+      "У ТЕБЯ = ПРОИГРЫШ",
+      "МАТЧ ДО 3 ПОБЕД",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
 
@@ -194,6 +261,17 @@ public:
   const char* hint() const override { return "ЗЕЛЕНАЯ: СТОП В ЗОНЕ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(255, 0, 120); }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "1 ИГРОК",
+      "КУРСОР БЕГАЕТ",
+      "ЖМИ ЗЕЛЕНУЮ В ЗОНЕ",
+      "ЦЕНТР ЗОНЫ = ОЧКИ",
+      "ЗОНА СУЖАЕТСЯ",
+      "3 ПРОМАХА = КОНЕЦ",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
 
@@ -229,6 +307,17 @@ public:
   const char* hint() const override { return "ПОВТОРИ СЕРИЮ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(160, 0, 255); }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "1 ИГРОК",
+      "СМОТРИ ВСПЫШКИ",
+      "ПОВТОРИ КНОПКАМИ",
+      "ЛЕВО = ЗЕЛЕНАЯ",
+      "ПРАВО = СИНЯЯ",
+      "ОШИБКА = КОНЕЦ",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
 
@@ -270,6 +359,17 @@ public:
   const char* hint() const override { return "КР=ПРЫЖОК СИН=ПОДКАТ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(0, 255, 160); }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "1 ИГРОК",
+      "КРАСНОЕ = ПРЫЖОК",
+      "СИНЕЕ = ПОДКАТ",
+      "ЗЕЛЕНАЯ ИЛИ СИНЯЯ",
+      "ВОВРЕМЯ = ОЧКО",
+      "3 ОШИБКИ = КОНЕЦ",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
 
@@ -318,6 +418,17 @@ public:
   const char* hint() const override { return "З=ВЫСТРЕЛ С=ВЗРЫВ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(0, 160, 255); }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "1 ИГРОК",
+      "ЗЕЛЕНАЯ = ВЫСТРЕЛ",
+      "СИНЯЯ = ВЗРЫВ",
+      "ВЗРЫВ ОГРАНИЧЕН",
+      "НЕ ПУСКАЙ ВРАГОВ",
+      "К БАЗЕ",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
   void reset() override;
   void update(const Inputs& in, Ctx& c) override;
 

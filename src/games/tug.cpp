@@ -100,8 +100,8 @@ void TugGame::oled(Ctx& c) {
   char b1[6], b2[6], s1[14], s2[14];
   snprintf(b1, sizeof b1, "%d", m.score[0]);
   snprintf(b2, sizeof b2, "%d", m.score[1]);
-  snprintf(s1, sizeof s1, "COMBO x%d", combo[0]);
-  snprintf(s2, sizeof s2, "COMBO x%d", combo[1]);
+  snprintf(s1, sizeof s1, "КОМБО x%d", combo[0]);
+  snprintf(s2, sizeof s2, "КОМБО x%d", combo[1]);
 
   // полоски = насколько близко каждый к своей "победной" границе
   float span = GOAL_P1 - GOAL_P2;
@@ -115,8 +115,8 @@ void TugGame::oled(Ctx& c) {
   r.name = "ЗЕЛЕНЫЙ"; r.big = b1; r.sub = s1; r.bar = prog1; r.active = (m.winner == 1);
 
   const char* foot = hint();
-  if (m.over())              foot = (m.winner == 1) ? "GREEN WINS THE MATCH" : "BLUE WINS THE MATCH";
-  else if (m.winner)         foot = (m.winner == 1) ? "green takes the round" : "blue takes the round";
+  if (m.over())              foot = (m.winner == 1) ? "ЗЕЛЕНЫЙ ПОБЕДИЛ" : "СИНИЙ ПОБЕДИЛ";
+  else if (m.winner)         foot = (m.winner == 1) ? "ЗЕЛЕНЫЙ ВЗЯЛ РАУНД" : "СИНИЙ ВЗЯЛ РАУНД";
 
   drawMatchOled(c, name(), m, l, r, foot);
 }

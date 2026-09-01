@@ -36,6 +36,20 @@ struct Ctx {
 };
 
 // ============================================================
+//  Текст экрана "как играть" (показывается перед стартом игры).
+//  Каждая строка должна помещаться в ширину OLED при size=1
+//  (до ~21 символа) и состоять из ЗАГЛАВНЫХ букв — кириллический
+//  шрифт не знает строчных букв и "Ё" (см. font_ru.h).
+// ============================================================
+struct RuleText {
+  const char* const* lines = nullptr;
+  uint8_t count = 0;
+
+  RuleText() {}
+  RuleText(const char* const* l, uint8_t c) : lines(l), count(c) {}
+};
+
+// ============================================================
 //  Базовый класс игры
 // ============================================================
 class Game {
@@ -46,6 +60,7 @@ public:
   virtual const char* hint() const { return ""; }  // подсказка в подвале
   virtual uint8_t players() const { return 2; }    // 1 или 2
   virtual Color   theme() const { return rgb(180, 180, 180); }  // цвет в меню
+  virtual RuleText rules() const { return RuleText(); }  // экран "как играть"
 
   virtual void reset() = 0;
   virtual void update(const Inputs& in, Ctx& c) = 0;

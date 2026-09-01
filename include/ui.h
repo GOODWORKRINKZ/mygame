@@ -56,6 +56,10 @@ void banner(Display& d, const char* big, const char* sub, const char* foot);
 void menuFrame(Display& d, const char* title, const char* const* items,
                const uint8_t* playerCounts, int count, int sel, const char* foot);
 
+// Экран "как играть": заголовок + страница строк описания + подвал.
+void rulesFrame(Display& d, const char* title, const char* right,
+                 const char* const* lines, uint8_t count, const char* foot);
+
 // Экран-заставка при включении, phase 0..2.
 void bootFrame(Display& d, uint8_t phase, uint8_t progress);
 

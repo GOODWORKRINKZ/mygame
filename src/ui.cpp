@@ -172,11 +172,27 @@ void menuFrame(Display& d, const char* title, const char* const* items,
   d.flush();
 }
 
+void rulesFrame(Display& d, const char* title, const char* right,
+                 const char* const* lines, uint8_t count, const char* foot) {
+  d.clear();
+  header(d, title, right);
+
+  // те же 4 строки, что и в меню: y=18,27,36,45 (шаг 9, size=1)
+  const int ROW_Y0 = 18;
+  const int ROW_DY = 9;
+  for (uint8_t i = 0; i < count && i < 4; i++) {
+    d.textCentered(ROW_Y0 + i * ROW_DY, lines[i], 1);
+  }
+
+  footer(d, foot);
+  d.flush();
+}
+
 void bootFrame(Display& d, uint8_t phase, uint8_t progress) {
   d.clear();
   if (phase == 0) {
     // заголовок в жёлтой зоне (size=1 глиф y=1..7, помещается)
-    d.textCentered(1, "LED ARCADE", 1);
+    d.textCentered(1, "ДОБРО ПОЖАЛОВАТЬ", 1);
     d.textCentered(Y_BIG, "АРКАДА", 2);
     bar(d, 14, Y_BAR, OLED_WIDTH - 28, 6, progress);
   } else if (phase == 1) {

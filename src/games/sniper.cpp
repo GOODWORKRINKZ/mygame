@@ -40,9 +40,9 @@ void SniperGame::update(const Inputs& in, Ctx& c) {
     if (c.now >= overUntil + 6000) { reset(); return; }
     Bg::confetti(c.leds, c.now, rgb(120, 0, 0), rgb(60, 0, 0));
     char sub[20];
-    snprintf(sub, sizeof sub, "SCORE %d", score);
-    Ui::banner(c.dpy, "GAME OVER", sub,
-               newRecord ? "NEW RECORD!" : "press to retry");
+    snprintf(sub, sizeof sub, "ОЧКИ %d", score);
+    Ui::banner(c.dpy, "КОНЕЦ ИГРЫ", sub,
+               newRecord ? "НОВЫЙ РЕКОРД!" : "ЖМИ ДЛЯ ПОВТОРА");
     return;
   }
 
@@ -124,13 +124,13 @@ void SniperGame::render(Ctx& c) {
 void SniperGame::oled(Ctx& c) {
   char big[10], l1[24], l2[24], right[8], foot[24];
   snprintf(big, sizeof big, "%d", score);
-  snprintf(l1, sizeof l1, "LVL %d   ZONE %d", level, zoneW);
-  snprintf(l2, sizeof l2, "BEST %d", best);
-  snprintf(right, sizeof right, "L%d", level);
+  snprintf(l1, sizeof l1, "УР %d  ЗОНА %d", level, zoneW);
+  snprintf(l2, sizeof l2, "РЕКОРД %d", best);
+  snprintf(right, sizeof right, "У%d", level);
 
   char hearts[8] = "";
   for (int i = 0; i < lives && i < 5; i++) strcat(hearts, "*");
-  snprintf(foot, sizeof foot, "LIVES %s", hearts);
+  snprintf(foot, sizeof foot, "ЖИЗНИ %s", hearts);
 
   Ui::solo(c.dpy, name(), right, big, l1, l2, foot);
 }

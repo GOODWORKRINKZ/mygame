@@ -11,9 +11,11 @@
 // ============================================================
 //  LED ARCADE — точка входа
 // ============================================================
-//  Устройство живёт в трёх состояниях:
+//  Устройство живёт в четырёх состояниях:
 //    Boot — заставка при включении;
-//    Menu — выбор игры (зелёная/синяя листают, MENU запускает);
+//    Menu — выбор игры (зелёная/синяя листают, MENU открывает "как играть");
+//    Help — экран "как играть" (зелёная/синяя листают текст, MENU стартует
+//           игру, удержание MENU — назад в меню);
 //    Play — идёт игра (MENU выходит, удержание MENU перезапускает).
 //
 //  Кадр фиксированный (FRAME_MS), но кнопки опрашиваются в каждом
@@ -27,12 +29,13 @@ Fx          fx;
 Button      btnP1, btnP2, btnMenu;
 GameManager manager;
 
-enum class AppState : uint8_t { Boot, Menu, Play };
+enum class AppState : uint8_t { Boot, Menu, Help, Play };
 static AppState state = AppState::Boot;
 
 static uint32_t lastFrame = 0;
 static uint32_t lastInput = 0;      // для "заставки" в простое
 static bool     menuLongUsed = false;
+static uint8_t  helpPage = 0;       // текущая страница экрана "как играть"
 
 // ---- защёлки фронтов между кадрами ----
 struct Latch {
@@ -59,8 +62,11 @@ static void fillBtn(BtnState& s, Button& b, Latch& l) {
 
 static void playBootAnimation();
 static void enterMenu();
+static void enterHelp();
 static void enterPlay();
+static void previewLeds(Ctx& c, Game* g, bool allowIdle);
 static void updateMenu(const Inputs& in, Ctx& c);
+static void updateHelp(const Inputs& in, Ctx& c);
 static void runDiagnostics();
 
 // ============================================================
@@ -147,29 +153,29 @@ static void playBootAnimation() {
 static void runDiagnostics() {
   LOG_I("DIAG", "strip diagnostics start");
   char l1[26], l2[26];
-  snprintf(l1, sizeof l1, "PHYS %d  GAME %d", LED_PHYSICAL_COUNT, LED_COUNT);
-  snprintf(l2, sizeof l2, "walls %d", LED_PHYSICAL_COUNT - LED_COUNT);
+  snprintf(l1, sizeof l1, "ФИЗ %d  ИГРА %d", LED_PHYSICAL_COUNT, LED_COUNT);
+  snprintf(l2, sizeof l2, "СТЕНЫ %d", LED_PHYSICAL_COUNT - LED_COUNT);
 
   // 1) цвета по всей физической ленте — жива ли она вообще
   dpy.clear();
-  dpy.textCentered(6, "LED TEST", 2);
-  dpy.textCentered(30, "1/3 colors (phys)", 1);
+  dpy.textCentered(6, "ТЕСТ ЛЕНТЫ", 2);
+  dpy.textCentered(30, "1/3 ЦВЕТА (ФИЗ)", 1);
   dpy.textCentered(44, l1, 1);
   dpy.flushNow();
   leds.colorTest();
 
   // 2) бегущий пиксель по физическим номерам — для сборки карты
   dpy.clear();
-  dpy.textCentered(6, "LED TEST", 2);
-  dpy.textCentered(30, "2/3 scan physical", 1);
-  dpy.textCentered(44, "pink = wall", 1);
+  dpy.textCentered(6, "ТЕСТ ЛЕНТЫ", 2);
+  dpy.textCentered(30, "2/3 СКАН (ФИЗ)", 1);
+  dpy.textCentered(44, "РОЗОВЫЙ = СТЕНА", 1);
   dpy.flushNow();
   leds.physicalScanTest();
 
   // 3) бегущий пиксель по логическим номерам — проверка карты
   dpy.clear();
-  dpy.textCentered(6, "LED TEST", 2);
-  dpy.textCentered(30, "3/3 scan logical", 1);
+  dpy.textCentered(6, "ТЕСТ ЛЕНТЫ", 2);
+  dpy.textCentered(30, "3/3 СКАН (ЛОГ)", 1);
   dpy.textCentered(44, l2, 1);
   dpy.flushNow();
   leds.oneByOneTest();
@@ -188,6 +194,15 @@ static void enterMenu() {
   LOG_I("APP", "menu, cursor on %s", manager.now()->name());
 }
 
+static void enterHelp() {
+  state = AppState::Help;
+  helpPage = 0;
+  fx.reset();
+  out.silence();
+  lastInput = millis();
+  LOG_I("APP", "help for %s", manager.now()->name());
+}
+
 static void enterPlay() {
   state = AppState::Play;
   fx.reset();
@@ -197,13 +212,10 @@ static void enterPlay() {
 }
 
 // ============================================================
-//  Меню выбора игры
+//  Лента: превью выбранной игры (общее для меню и экрана "как играть")
 // ============================================================
-static void updateMenu(const Inputs& in, Ctx& c) {
-  Game* g = manager.now();
-
-  // ---- лента: превью выбранной игры ----
-  bool idle = (c.now - lastInput) > 15000;
+static void previewLeds(Ctx& c, Game* g, bool allowIdle) {
+  bool idle = allowIdle && (c.now - lastInput) > 15000;
   c.leds.clear();
   if (idle) {
     // режим "витрины" — радуга и по полю, и по стенам
@@ -218,12 +230,62 @@ static void updateMenu(const Inputs& in, Ctx& c) {
     c.leds.add(0, colScale(COL_P1, 160));
     if (g->players() == 2) c.leds.add(LED_COUNT - 1, colScale(COL_P2, 160));
   }
+}
+
+// ============================================================
+//  Меню выбора игры
+// ============================================================
+static void updateMenu(const Inputs& in, Ctx& c) {
+  Game* g = manager.now();
+  previewLeds(c, g, true);
 
   // ---- OLED: список ----
   char foot[26];
-  snprintf(foot, sizeof foot, "MENU=play  HOLD=test");
-  Ui::menuFrame(c.dpy, "SELECT GAME", manager.names(), manager.playerCounts(),
+  snprintf(foot, sizeof foot, "МЕНЮ=ИГРАТЬ  УДЕРЖ=ТЕСТ");
+  Ui::menuFrame(c.dpy, "ВЫБОР ИГРЫ", manager.names(), manager.playerCounts(),
                 manager.count(), manager.index(), foot);
+}
+
+// ============================================================
+//  Экран "как играть" — описание игры перед стартом.
+//  Листается кнопками P1/P2 (той же парой, что и в меню), MENU
+//  запускает саму игру, долгое нажатие MENU — назад в меню.
+// ============================================================
+static const uint8_t HELP_LINES_PER_PAGE = 4;
+
+static void updateHelp(const Inputs& in, Ctx& c) {
+  Game* g = manager.now();
+  previewLeds(c, g, false);
+
+  RuleText rt = g->rules();
+  uint8_t pageCount = 1;
+  if (rt.count > 0) {
+    pageCount = (rt.count + HELP_LINES_PER_PAGE - 1) / HELP_LINES_PER_PAGE;
+    if (pageCount < 1) pageCount = 1;
+  }
+  if (helpPage >= pageCount) helpPage = pageCount - 1;
+
+  if ((in.p1.pressed || btnP1.repeat()) && pageCount > 1) {
+    helpPage = (uint8_t)((helpPage + 1) % pageCount);
+    out.sfx(Sfx::Click);
+  }
+  if ((in.p2.pressed || btnP2.repeat()) && pageCount > 1) {
+    helpPage = (uint8_t)(helpPage == 0 ? pageCount - 1 : helpPage - 1);
+    out.sfx(Sfx::Click);
+  }
+
+  const char* const* pageLines = nullptr;
+  uint8_t linesOnPage = 0;
+  if (rt.count > 0) {
+    uint8_t start = helpPage * HELP_LINES_PER_PAGE;
+    linesOnPage = (uint8_t)((rt.count - start < HELP_LINES_PER_PAGE)
+                             ? (rt.count - start) : HELP_LINES_PER_PAGE);
+    pageLines = rt.lines + start;
+  }
+
+  char right[8];
+  snprintf(right, sizeof right, "%d/%d", helpPage + 1, pageCount);
+  Ui::rulesFrame(c.dpy, g->name(), right, pageLines, linesOnPage, "МЕНЮ=ИГРАТЬ  ЛИСТАЙ");
 }
 
 // ============================================================
@@ -264,9 +326,16 @@ void loop() {
       // Зелёная (физически справа) — листает ВНИЗ, синяя (слева) — ВВЕРХ.
       if (in.p1.pressed || btnP1.repeat()) { manager.next(); out.sfx(Sfx::Click); }
       if (in.p2.pressed || btnP2.repeat()) { manager.prev(); out.sfx(Sfx::Click); }
-      if (menuShort) { out.sfx(Sfx::Select); enterPlay(); break; }
+      if (menuShort) { out.sfx(Sfx::Select); enterHelp(); break; }
       if (menuLong)  { runDiagnostics(); lastFrame = millis(); }
       updateMenu(in, c);
+      break;
+
+    case AppState::Help:
+      // P1/P2 листают описание, MENU — старт игры, удержание — назад в меню.
+      if (menuShort) { out.sfx(Sfx::Select); enterPlay(); break; }
+      if (menuLong)  { out.sfx(Sfx::Back); enterMenu(); break; }
+      updateHelp(in, c);
       break;
 
     case AppState::Play:
@@ -292,7 +361,7 @@ void loop() {
     lastBeat = now;
     LOG_I("HB", "up=%lus state=%s game=%s heap=%u",
           (unsigned long)(now / 1000),
-          state == AppState::Menu ? "menu" : "play",
+          state == AppState::Menu ? "menu" : state == AppState::Help ? "help" : "play",
           manager.now()->name(), ESP.getFreeHeap());
   }
 }

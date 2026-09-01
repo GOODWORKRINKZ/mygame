@@ -112,13 +112,13 @@ void SprintGame::oled(Ctx& c) {
 
   Panel l, r;
   // Зелёный игрок (winner=1, p=1) — справа, синий (winner=2, p=0) — слева.
-  l.name = "BLUE";  l.big = b2; l.sub = s2; l.bar = prog2; l.active = (m.winner == 2);
-  r.name = "GREEN"; r.big = b1; r.sub = s1; r.bar = prog1; r.active = (m.winner == 1);
+  l.name = "СИНИЙ";   l.big = b2; l.sub = s2; l.bar = prog2; l.active = (m.winner == 2);
+  r.name = "ЗЕЛЕНЫЙ"; r.big = b1; r.sub = s1; r.bar = prog1; r.active = (m.winner == 1);
 
   const char* f;
-  if (m.over())      f = (m.winner == 1) ? "GREEN WINS THE MATCH" : "BLUE WINS THE MATCH";
-  else if (m.winner) f = "photo finish!";
-  else if (startAt)  { snprintf(foot, sizeof foot, "ready... %lu",
+  if (m.over())      f = (m.winner == 1) ? "ЗЕЛЕНЫЙ ПОБЕДИЛ" : "СИНИЙ ПОБЕДИЛ";
+  else if (m.winner) f = "ФОТОФИНИШ!";
+  else if (startAt)  { snprintf(foot, sizeof foot, "СТАРТ: %lu",
                                 (unsigned long)((startAt - c.now) / 450 + 1)); f = foot; }
   else               f = hint();
 
