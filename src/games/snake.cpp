@@ -80,9 +80,11 @@ void SnakeGame::placeRock() {
     if (d < 3) continue;
 
     // камень режет дугу надвое, и половина за ним пропадает. Проверяем,
-    // что змее осталось где жить: тело плюс запас на следующую еду.
+    // что змее осталось где жить: тело плюс запас на несколько следующих
+    // порций еды. С запасом 6 кольцо успевает ощутимо поджаться, но круг
+    // закрывается не каждые пять укусов.
     rock[p] = true;
-    if (arcCells(test, LED_COUNT) < len + 4) {
+    if (arcCells(test, LED_COUNT) < len + 6) {
       rock[p] = false;
       continue;
     }
@@ -99,6 +101,8 @@ void SnakeGame::reset() {
   stepMs = SNAKE_STEP_START;
   nextStep = millis() + stepMs;
   score = 0;
+  circles = 1;
+  circleUntil = 0;
   best = store.best(KEY_BEST);
   newRecord = false;
   over = false;
@@ -116,6 +120,21 @@ void SnakeGame::die(Ctx& c) {
   c.out.buzz(160);
   c.fx.burst((float)body[0], rgb(255, 60, 0), 14, 26.0f);
   c.fx.flash(rgb(140, 0, 0), 300);
+}
+
+// Дуга забита змеёй целиком — еде просто некуда встать. Это не проигрыш,
+// а пройденный круг: кольцо открывается заново, змею подрезаем до половины
+// кольца, чтобы было где развернуться, а скорость остаётся набранной.
+void SnakeGame::newCircle(Ctx& c) {
+  circles++;
+  score += 25;
+  for (int i = 0; i < LED_COUNT; i++) rock[i] = false;
+  if (len > LED_COUNT / 2) len = LED_COUNT / 2;
+  circleUntil = c.now + 800;
+  c.out.sfx(Sfx::Fanfare);
+  c.out.buzz(60);
+  c.fx.flash(rgb(0, 255, 120), 320);
+  placeFood();
 }
 
 void SnakeGame::step(Ctx& c) {
@@ -144,6 +163,7 @@ void SnakeGame::step(Ctx& c) {
     placeFood();
     stepMs = (uint16_t)(stepMs * SNAKE_STEP_UP);
     if (stepMs < SNAKE_STEP_MIN) stepMs = SNAKE_STEP_MIN;
+    if (food < 0) newCircle(c);       // ставить еду больше некуда
   }
 }
 
@@ -208,15 +228,19 @@ void SnakeGame::render(Ctx& c) {
   // голова
   L.set(body[0], rgb(220, 255, 220));
   if (c.now < flipUntil) L.add(body[0], rgb(255, 255, 255));
+
+  // "круг пройден" — кольцо коротко пробегает волной
+  if (c.now < circleUntil) {
+    uint8_t phase = (uint8_t)((c.now / 3) & 0xFF);
+    for (int i = 0; i < LED_COUNT; i++)
+      L.add(i, colScale(rgb(0, 255, 120), (uint8_t)(sin8((uint8_t)(phase - i * 9)) / 3)));
+  }
 }
 
 void SnakeGame::oled(Ctx& c) {
-  int rocks = 0;
-  for (int i = 0; i < LED_COUNT; i++) if (rock[i]) rocks++;
-
   char big[10], l1[24], l2[24], right[8];
   snprintf(big, sizeof big, "%d", score);
-  snprintf(l1, sizeof l1, "ДЛИНА %d  КАМНИ %d", len, rocks);
+  snprintf(l1, sizeof l1, "ДЛИНА %d  КРУГ %d", len, circles);
   snprintf(l2, sizeof l2, "РЕКОРД %d", best);
   snprintf(right, sizeof right, "Д%d", len);
 

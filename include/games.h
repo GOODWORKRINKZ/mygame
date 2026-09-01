@@ -762,16 +762,19 @@ private:
   uint16_t stepMs = SNAKE_STEP_START;
   uint32_t nextStep = 0;
   int      score = 0;
+  int      circles = 1;
   int      best = 0;
   bool     newRecord = false;
   bool     over = false;
   uint32_t overUntil = 0;
   uint32_t flipUntil = 0;
+  uint32_t circleUntil = 0;
 
   bool occupied(int p) const;
   int  arcCells(int* out, int cap) const;   // дуга, доступная змее
   void placeFood();
   void placeRock();
+  void newCircle(Ctx& c);                   // дуга забита — открываем кольцо заново
   void step(Ctx& c);
   void die(Ctx& c);
   void render(Ctx& c);
