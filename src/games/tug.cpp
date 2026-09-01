@@ -109,8 +109,10 @@ void TugGame::oled(Ctx& c) {
   int prog2 = 100 - prog1;
 
   Panel l, r;
-  l.name = "GREEN"; l.big = b1; l.sub = s1; l.bar = prog1; l.active = (m.winner == 1);
-  r.name = "BLUE";  r.big = b2; r.sub = s2; r.bar = prog2; r.active = (m.winner == 2);
+  // Зелёный игрок (p=1) теперь физически справа — выводим его в правой панели.
+  // Синий игрок (p=0) физически слева — в левой панели.
+  l.name = "СИНИЙ";   l.big = b2; l.sub = s2; l.bar = prog2; l.active = (m.winner == 2);
+  r.name = "ЗЕЛЕНЫЙ"; r.big = b1; r.sub = s1; r.bar = prog1; r.active = (m.winner == 1);
 
   const char* foot = hint();
   if (m.over())              foot = (m.winner == 1) ? "GREEN WINS THE MATCH" : "BLUE WINS THE MATCH";

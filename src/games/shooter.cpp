@@ -181,10 +181,11 @@ void ShooterGame::oled(Ctx& c, const Inputs& in) {
   }
 
   Panel l, r;
-  l.name = "ЗЕЛЕНЫЙ"; l.big = b1; l.sub = s1;
-  l.dots = m.score[0]; l.dotsMax = ROUNDS_TO_WIN; l.active = (m.winner == 1);
-  r.name = "СИНИЙ";   r.big = b2; r.sub = s2;
-  r.dots = m.score[1]; r.dotsMax = ROUNDS_TO_WIN; r.active = (m.winner == 2);
+  // Зелёный (winner=1) — справа, синий (winner=2) — слева.
+  l.name = "СИНИЙ";   l.big = b2; l.sub = s2;
+  l.dots = m.score[1]; l.dotsMax = ROUNDS_TO_WIN; l.active = (m.winner == 2);
+  r.name = "ЗЕЛЕНЫЙ"; r.big = b1; r.sub = s1;
+  r.dots = m.score[0]; r.dotsMax = ROUNDS_TO_WIN; r.active = (m.winner == 1);
 
   const char* foot = hint();
   if (m.over())      foot = (m.winner == 1) ? "ЗЕЛЕНЫЙ ПОБЕДИЛ" : "СИНИЙ ПОБЕДИЛ";

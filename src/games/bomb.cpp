@@ -147,8 +147,9 @@ void BombGame::oled(Ctx& c) {
   int fusePct = (int)((left * 100) / fuseTotal);
 
   Panel l, r;
-  l.name = "ЗЕЛЕНЫЙ"; l.big = b1; l.sub = s1; l.bar = fusePct; l.active = (m.winner == 1);
-  r.name = "СИНИЙ";   r.big = b2; r.sub = s2; r.bar = fusePct; r.active = (m.winner == 2);
+  // Зелёный (winner=1) — справа, синий (winner=2) — слева.
+  l.name = "СИНИЙ";   l.big = b2; l.sub = s2; l.bar = fusePct; l.active = (m.winner == 2);
+  r.name = "ЗЕЛЕНЫЙ"; r.big = b1; r.sub = s1; r.bar = fusePct; r.active = (m.winner == 1);
 
   const char* f = foot;
   if (m.over())      f = (m.winner == 1) ? "ЗЕЛЕНЫЙ ПОБЕДИЛ" : "СИНИЙ ПОБЕДИЛ";

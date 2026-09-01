@@ -111,8 +111,9 @@ void SprintGame::oled(Ctx& c) {
   snprintf(s2, sizeof s2, "%d%%", prog2);
 
   Panel l, r;
-  l.name = "GREEN"; l.big = b1; l.sub = s1; l.bar = prog1; l.active = (m.winner == 1);
-  r.name = "BLUE";  r.big = b2; r.sub = s2; r.bar = prog2; r.active = (m.winner == 2);
+  // Зелёный игрок (winner=1, p=1) — справа, синий (winner=2, p=0) — слева.
+  l.name = "BLUE";  l.big = b2; l.sub = s2; l.bar = prog2; l.active = (m.winner == 2);
+  r.name = "GREEN"; r.big = b1; r.sub = s1; r.bar = prog1; r.active = (m.winner == 1);
 
   const char* f;
   if (m.over())      f = (m.winner == 1) ? "GREEN WINS THE MATCH" : "BLUE WINS THE MATCH";

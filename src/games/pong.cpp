@@ -209,8 +209,9 @@ void PongGame::oled(Ctx& c) {
   Panel l, r;
   int bar1 = (int)((pad[0].charge / PONG_PADDLE_MAX) * 100.0f);
   int bar2 = (int)((pad[1].charge / PONG_PADDLE_MAX) * 100.0f);
-  l.name = "ЗЕЛЕНЫЙ"; l.big = b1; l.sub = s1; l.bar = bar1; l.active = (m.winner == 1);
-  r.name = "СИНИЙ";   r.big = b2; r.sub = s2; r.bar = bar2; r.active = (m.winner == 2);
+  // Зелёный (winner=1) — справа, синий (winner=2) — слева.
+  l.name = "СИНИЙ";   l.big = b2; l.sub = s2; l.bar = bar2; l.active = (m.winner == 2);
+  r.name = "ЗЕЛЕНЫЙ"; r.big = b1; r.sub = s1; r.bar = bar1; r.active = (m.winner == 1);
 
   const char* f = foot;
   if (m.over())        f = (m.winner == 1) ? "ЗЕЛЕНЫЙ ПОБЕДИЛ" : "СИНИЙ ПОБЕДИЛ";
