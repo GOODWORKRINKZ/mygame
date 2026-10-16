@@ -52,6 +52,8 @@ static inline bool isWall(int x, int y) {
 
 void DoomGame::reset() {
   px = 8.0f; py = 8.0f; ang = -1.5708f;
+  angFrom = angTo = ang; turnStart = turnUntil = 0;
+  firedDuring[0] = firedDuring[1] = false;
   hp = DOOM_HP;
   wave = 0;
   kills = 0;
@@ -67,12 +69,22 @@ void DoomGame::reset() {
   over = false;
   overUntil = 0;
   lastOled = 0;
+  // углы клеток кольца вокруг центра матрицы (столбец 9.5, ряд 1.5),
+  // ряд растёт вниз — как экранные координаты
+  for (int i = 0; i < RING.len; i++) {
+    int ph = RING.idx[i];
+    float cx = 0, cy = 0;
+    for (int r = 0; r < LED_GRID_ROWS; r++)
+      for (int cc = 0; cc < LED_GRID_COLS; cc++)
+        if (LED_GRID[r][cc] == ph) { cx = (float)cc; cy = (float)r; }
+    ringAng[i] = atan2f(cy - 1.5f, cx - (MATRIX_COL0 + 1.5f));
+  }
   nextWave(millis());
 }
 
 void DoomGame::nextWave(uint32_t now) {
   wave++;
-  toSpawn = 2 + wave;
+  toSpawn = 1 + wave;
   spawnIn = 1.2f;
   hp += DOOM_WAVE_HEAL;
   if (hp > DOOM_HP) hp = DOOM_HP;
@@ -94,7 +106,8 @@ void DoomGame::spawnFoe() {
       e.hp = DOOM_FOE_HP;
       e.biteAt = 0;
       e.hitUntil = 0;
-      e.speed = DOOM_FOE_SPEED + wave * 0.08f;
+      e.speed = DOOM_FOE_SPEED + wave * 0.06f;
+      e.growled = false;
       alive++;
       return;
     }
@@ -147,6 +160,7 @@ void DoomGame::fire(Ctx& c) {
     while (rel > 3.14159f) rel -= 6.28318f;
     while (rel < -3.14159f) rel += 6.28318f;
     float tol = atan2f(0.45f, dist);              // половина ширины демона
+    if (tol < DOOM_AIM_HALF) tol = DOOM_AIM_HALF; // при шаге поворота 45° створ щедрый
     if (fabsf(rel) > tol) continue;
     if (dist > wallDist(ang)) continue;
     if (dist < bestD) { bestD = dist; target = &e; }
@@ -177,19 +191,40 @@ void DoomGame::update(const Inputs& in, Ctx& c) {
     return;
   }
 
-  // ---- управление ----
+  // ---- управление: тап = поворот на 45°, держишь одну = идёшь,
+  //      держишь обе = стоишь и стреляешь ----
+  if (in.p1.pressed) firedDuring[0] = false;
+  if (in.p2.pressed) firedDuring[1] = false;
   bool g = in.p1.held, b = in.p2.held;
-  if (g && b) {
-    if (c.now >= fireCd) fire(c);
-  } else if (g) {
-    ang += DOOM_TURN_SPEED * c.dt;
-  } else if (b) {
-    ang -= DOOM_TURN_SPEED * c.dt;
-  } else if (c.now >= waveBannerUntil) {
-    tryMove(cosf(ang) * DOOM_WALK_SPEED * c.dt, sinf(ang) * DOOM_WALK_SPEED * c.dt);
+
+  if (turnUntil) {                                   // анимация поворота
+    if (c.now >= turnUntil) { ang = angTo; turnUntil = 0; }
+    else {
+      float k = (float)(c.now - turnStart) / (float)(turnUntil - turnStart);
+      ang = angFrom + (angTo - angFrom) * k;
+    }
   }
-  while (ang > 3.14159f) ang -= 6.28318f;
-  while (ang < -3.14159f) ang += 6.28318f;
+
+  if (g && b) {
+    if (c.now >= fireCd) { fire(c); firedDuring[0] = firedDuring[1] = true; }
+  } else {
+    // тап — поворот (если за это нажатие не стреляли и вторая не зажата)
+    int turn = 0;
+    if (in.p1.released && in.p1.lastHeldMs < DOOM_TAP_MS && !firedDuring[0] && !b) turn = +1;
+    if (in.p2.released && in.p2.lastHeldMs < DOOM_TAP_MS && !firedDuring[1] && !g) turn = -1;
+    if (turn && !turnUntil) {
+      angFrom = ang;
+      angTo = ang + turn * DOOM_TURN_STEP;
+      turnStart = c.now; turnUntil = c.now + DOOM_TURN_MS;
+      c.out.tone(500, 10);
+    }
+    // удержание одной — ход вперёд
+    bool walk = (g && in.p1.heldMs >= DOOM_TAP_MS) || (b && in.p2.heldMs >= DOOM_TAP_MS);
+    if (walk && !turnUntil && c.now >= waveBannerUntil)
+      tryMove(cosf(ang) * DOOM_WALK_SPEED * c.dt, sinf(ang) * DOOM_WALK_SPEED * c.dt);
+  }
+  while (ang > 3.14159f) { ang -= 6.28318f; angFrom -= 6.28318f; angTo -= 6.28318f; }
+  while (ang < -3.14159f) { ang += 6.28318f; angFrom += 6.28318f; angTo += 6.28318f; }
 
   // ---- спавн волны ----
   if (toSpawn > 0) {
@@ -207,6 +242,7 @@ void DoomGame::update(const Inputs& in, Ctx& c) {
     if (e.dying) { if (c.now >= e.dieUntil) e.active = false; continue; }
     float dx = px - e.x, dy = py - e.y;
     float dist = sqrtf(dx * dx + dy * dy);
+    if (!e.growled && dist < 2.5f) { e.growled = true; c.out.tone(110, 90); c.out.buzz(15); }
     if (dist > 0.9f) {
       float step = e.speed * c.dt;
       float nx = e.x + dx / dist * step, ny = e.y + dy / dist * step;
@@ -240,37 +276,45 @@ void DoomGame::update(const Inputs& in, Ctx& c) {
 void DoomGame::render(Ctx& c) {
   LedStrip& L = c.leds;
   L.clear();
-  // клетка радара = 2x2 арены, игрок в клетке (1,2) матрицы
-  int ox = (int)px - 3, oy = (int)py - 4;
-  for (int y = 0; y < N; y++)
-    for (int x = 0; x < N; x++) {
-      int ax = ox + x * 2, ay = oy + y * 2;
-      int walls = 0;
-      for (int k = 0; k < 4; k++) if (isWall(ax + (k & 1), ay + (k >> 1))) walls++;
-      Color col = walls ? colScale(rgb(90, 40, 0), (uint8_t)(40 + walls * 50)) : rgb(2, 2, 4);
-      L.setXY(mcol(x), y, col);
-    }
+
+  // ---- кольцо — радар относительно взгляда: верх матрицы = прямо
+  //      перед тобой, яркость = близость, мигание = кусает ----
+  for (int i = 0; i < RING.len; i++) L.set(RING, i, rgb(4, 4, 6));
   for (auto& e : foes) {
     if (!e.active || e.dying) continue;
-    int rx = (int)floorf((e.x - ox) / 2.0f), ry = (int)floorf((e.y - oy) / 2.0f);
-    if (rx >= 0 && rx < N && ry >= 0 && ry < N) L.addXY(mcol(rx), ry, rgb(255, 0, 0));
+    float dx = e.x - px, dy = e.y - py;
+    float dist = sqrtf(dx * dx + dy * dy);
+    float rel = atan2f(dy, dx) - ang;                 // 0 = прямо, >0 = справа
+    float scr = -1.5708f + rel;                       // экранный угол: вверх = прямо
+    int bestI = 0; float bestD = 99;
+    for (int i = 0; i < RING.len; i++) {
+      float d = scr - ringAng[i];
+      while (d > 3.14159f) d -= 6.28318f;
+      while (d < -3.14159f) d += 6.28318f;
+      if (fabsf(d) < bestD) { bestD = fabsf(d); bestI = i; }
+    }
+    float k = 1.0f - (dist - 1.0f) / 9.0f;
+    if (k < 0.15f) k = 0.15f;
+    if (k > 1.0f) k = 1.0f;
+    uint8_t bright = (uint8_t)(40 + 215 * k);
+    if (dist < 1.3f && ((c.now / 90) & 1)) bright = 20;
+    L.add(RING, bestI, colScale(rgb(255, 0, 0), bright));
   }
-  Color me = (c.now < hurtUntil) ? rgb(255, 60, 60) : rgb(255, 255, 255);
-  L.setXY(mcol(1), 2, me);
-  // направление взгляда — тусклая соседняя клетка
-  int fx = 1 + (int)roundf(cosf(ang)), fy = 2 + (int)roundf(sinf(ang));
-  L.addXY(mcol(fx), fy, rgb(60, 60, 70));
 
-  // рукав зелёного — здоровье, синего — прогресс волны
+  // ---- сердцевина — здоровье ----
   float k = (float)hp / (float)DOOM_HP;
   Color hc = colLerp(rgb(255, 20, 0), rgb(0, 220, 60), (uint8_t)(k * 255));
+  uint8_t hb = (c.now < hurtUntil) ? (((c.now / 60) & 1) ? 255 : 60) : (uint8_t)(60 + 120 * k);
+  L.fill(CORE, colScale(hc, hb));
+
+  // ---- рукав зелёного — здоровье шкалой, синего — демоны волны ----
   float lit = k * ARM_P1.len;
   for (int i = 0; i < ARM_P1.len; i++) {
     float f = lit - i;
     uint8_t bb = f >= 1.0f ? 150 : (f > 0 ? (uint8_t)(f * 150) : 0);
     L.set(ARM_P1, i, colScale(hc, (uint8_t)(6 + bb)));
   }
-  int total = 2 + wave, left = toSpawn + alive;
+  int total = 1 + wave, left = toSpawn + alive;
   for (int i = 0; i < ARM_P2.len; i++) {
     bool on = i < total && i < ARM_P2.len;
     bool dead = on && i >= left;
@@ -286,6 +330,17 @@ static void drawScaled(Adafruit_SSD1306& g, const uint8_t* bmp, int bw, int bh,
   if (size < 2) { g.drawPixel(cx, bottom - 1, SSD1306_WHITE); return; }
   int x0 = cx - size / 2, y0 = bottom - size;
   int bytesPerRow = (bw + 7) / 8;
+  // чёрная подложка: вырез в стене, иначе белый демон на белой стене невидим
+  for (int sy = -1; sy <= size; sy++) {
+    int yy = y0 + sy;
+    if (yy < SCENE_Y0 || yy > SCENE_Y0 + SCENE_H - 1) continue;
+    for (int sx = -1; sx <= size; sx++) {
+      int xx = x0 + sx;
+      if (xx < 0 || xx >= OLED_WIDTH) continue;
+      if (zbuf[xx / 2] < dist) continue;
+      g.drawPixel(xx, yy, SSD1306_BLACK);
+    }
+  }
   for (int sy = 0; sy < size; sy++) {
     int yy = y0 + sy;
     if (yy < SCENE_Y0 || yy > SCENE_Y0 + SCENE_H - 1) continue;
@@ -378,6 +433,26 @@ void DoomGame::oled(Ctx& c) {
       bool flash = (c.now < e.hitUntil) && ((c.now / 40) & 1);
       if (flash) continue;
       drawScaled(g, SPR_DEMON, 16, 16, sx, bottom, size, zbuf, perp);
+    }
+  }
+
+  // ---- стрелки у краёв: демон вне поля зрения ----
+  for (auto& e : foes) {
+    if (!e.active || e.dying) continue;
+    float dx = e.x - px, dy = e.y - py;
+    float dist = sqrtf(dx * dx + dy * dy);
+    float rel = atan2f(dy, dx) - ang;
+    while (rel > 3.14159f) rel -= 6.28318f;
+    while (rel < -3.14159f) rel += 6.28318f;
+    if (fabsf(rel) <= FOV / 2) continue;
+    int sz = dist < 2.0f ? 6 : (dist < 5.0f ? 4 : 3);
+    bool blink = dist < 1.5f && ((c.now / 100) & 1);
+    if (blink) continue;
+    if (rel > 0) g.fillTriangle(127, MID, 127 - sz, MID - sz, 127 - sz, MID + sz, SSD1306_WHITE);
+    else         g.fillTriangle(0, MID, sz, MID - sz, sz, MID + sz, SSD1306_WHITE);
+    if (fabsf(rel) > 2.4f) {   // почти за спиной — стрелка и снизу
+      int bx = rel > 0 ? 110 : 18;
+      g.fillTriangle(bx, 62, bx - 3, 58, bx + 3, 58, SSD1306_WHITE);
     }
   }
 

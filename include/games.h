@@ -759,7 +759,7 @@ private:
 class DoomGame : public Game {
 public:
   const char* name() const override { return "ДУМ"; }
-  const char* hint() const override { return "ОБЕ КНОПКИ = ОГОНЬ"; }
+  const char* hint() const override { return "ТАП=ПОВОРОТ ДЕРЖИ=ИДИ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(255, 0, 0); }
   const MusicTrack* music() const override { return &MUSIC_DOOM; }
@@ -769,14 +769,15 @@ public:
     static const char* L[] = {
       "1 ИГРОК",
       "АРЕНА ОТ ПЕРВОГО ЛИЦА",
-      "ИДЕШЬ ВПЕРЕД САМ",
-      "ДЕРЖИ ЗЕЛ = ВПРАВО",
-      "ДЕРЖИ СИН = ВЛЕВО",
-      "ОБЕ = СТОЙ И СТРЕЛЯЙ",
+      "ТАП ЗЕЛ = ВПРАВО 45",
+      "ТАП СИН = ВЛЕВО",
+      "ДЕРЖИ ОДНУ = ИДИ",
+      "ДЕРЖИ ОБЕ = СТРЕЛЯЙ",
       "ДЕМОНЫ КУСАЮТСЯ",
       "2 ВЫСТРЕЛА = ДЕМОН",
       "ВОЛНЫ ДО СМЕРТИ",
-      "ЛЕНТА = РАДАР",
+      "КОЛЬЦО = РАДАР:",
+      "ВЕРХ = ПЕРЕД ТОБОЙ",
     };
     return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
   }
@@ -787,12 +788,16 @@ private:
   struct Foe {
     float x = 0, y = 0, speed = 0;
     int8_t hp = 0;
-    bool active = false, dying = false;
+    bool active = false, dying = false, growled = false;
     uint32_t biteAt = 0, hitUntil = 0, dieUntil = 0;
   };
 
   Foe      foes[DOOM_MAX_FOES];
+  float    ringAng[12];            // экранный угол каждой клетки кольца вокруг центра матрицы
   float    px = 8, py = 8, ang = 0;
+  float    angFrom = 0, angTo = 0;
+  uint32_t turnStart = 0, turnUntil = 0;
+  bool     firedDuring[2] = {false, false};   // во время этого нажатия был выстрел — не поворот
   int      hp = DOOM_HP;
   int      wave = 0, kills = 0, alive = 0, toSpawn = 0;
   float    spawnIn = 0;
