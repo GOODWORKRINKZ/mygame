@@ -200,6 +200,12 @@ static const Note T_TUNNEL[] = {
   {N_F4, E}, {N_C5, E}, {N_F5, E}, {N_C5, E}, {N_G4, Q}, {N_C5, Q},
 };
 
+//  ДУМ — тяжёлый рифф в басу
+static const Note T_DOOM[] = {
+  {N_E3, E}, {N_E3, E}, {N_E4, E}, {N_E3, E}, {N_E3, E}, {N_D4, E}, {N_E3, E}, {N_E3, E},
+  {N_C4, E}, {N_E3, E}, {N_E3, E}, {N_Bb3, E}, {N_E3, E}, {N_E3, E}, {N_B3, E}, {N_C4, E},
+};
+
 const MusicTrack MUSIC_MENU     = makeTrack(T_MENU);
 const MusicTrack MUSIC_TUG      = makeTrack(T_TUG);
 const MusicTrack MUSIC_SHOOTER  = makeTrack(T_SHOOTER);
@@ -227,6 +233,7 @@ const MusicTrack MUSIC_DINO     = makeTrack(T_DINO);
 const MusicTrack MUSIC_RACE     = makeTrack(T_RACE);
 const MusicTrack MUSIC_MAZE     = makeTrack(T_MAZE);
 const MusicTrack MUSIC_TUNNEL   = makeTrack(T_TUNNEL);
+const MusicTrack MUSIC_DOOM     = makeTrack(T_DOOM);
 
 // ============================================================
 //  Банки эффектов. Чего нет в банке — звучит стандартно.
@@ -430,6 +437,19 @@ static const SfxOverride B_TUNNEL[] = {
   SFX_MEL(Click, S_TUN_STEP),
 };
 
+// ДУМ — дробовик, рык, укус, лопнувший демон
+static const Note S_DOOM_HURT[] = { {90, 60}, {70, 80} };
+static const Note S_DOOM_DIE[]  = { {320, 40}, {180, 60}, {90, 120} };
+static const Note S_DOOM_BITE[] = { {200, 50}, {0, 30}, {150, 120} };
+static const Note S_DOOM_WAVE[] = { {165, 120}, {196, 120}, {220, 200} };
+static const SfxOverride B_DOOM[] = {
+  SFX_SLIDE(Shoot, 700, 120, 110),
+  SFX_MEL(Hit, S_DOOM_HURT),
+  SFX_MEL(Explode, S_DOOM_DIE),
+  SFX_MEL(Error, S_DOOM_BITE),
+  SFX_MEL(LevelUp, S_DOOM_WAVE),
+};
+
 const SfxBank SND_SHOOTER  = makeBank(B_SHOOTER);
 const SfxBank SND_PONG     = makeBank(B_PONG);
 const SfxBank SND_DUEL     = makeBank(B_DUEL);
@@ -452,3 +472,4 @@ const SfxBank SND_DINO     = makeBank(B_DINO);
 const SfxBank SND_RACE     = makeBank(B_RACE);
 const SfxBank SND_MAZE     = makeBank(B_MAZE);
 const SfxBank SND_TUNNEL   = makeBank(B_TUNNEL);
+const SfxBank SND_DOOM     = makeBank(B_DOOM);

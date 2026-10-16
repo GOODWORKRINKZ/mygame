@@ -754,6 +754,65 @@ private:
 };
 
 // ============================================================
+//  7g) DOOM — арена от первого лица (1 игрок)
+// ============================================================
+class DoomGame : public Game {
+public:
+  const char* name() const override { return "ДУМ"; }
+  const char* hint() const override { return "ОБЕ КНОПКИ = ОГОНЬ"; }
+  uint8_t players() const override { return 1; }
+  Color theme() const override { return rgb(255, 0, 0); }
+  const MusicTrack* music() const override { return &MUSIC_DOOM; }
+  const SfxBank* sounds() const override { return &SND_DOOM; }
+  bool  fullCanvas() const override { return true; }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "1 ИГРОК",
+      "АРЕНА ОТ ПЕРВОГО ЛИЦА",
+      "ИДЕШЬ ВПЕРЕД САМ",
+      "ДЕРЖИ ЗЕЛ = ВПРАВО",
+      "ДЕРЖИ СИН = ВЛЕВО",
+      "ОБЕ = СТОЙ И СТРЕЛЯЙ",
+      "ДЕМОНЫ КУСАЮТСЯ",
+      "2 ВЫСТРЕЛА = ДЕМОН",
+      "ВОЛНЫ ДО СМЕРТИ",
+      "ЛЕНТА = РАДАР",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
+  void reset() override;
+  void update(const Inputs& in, Ctx& c) override;
+
+private:
+  struct Foe {
+    float x = 0, y = 0, speed = 0;
+    int8_t hp = 0;
+    bool active = false, dying = false;
+    uint32_t biteAt = 0, hitUntil = 0, dieUntil = 0;
+  };
+
+  Foe      foes[DOOM_MAX_FOES];
+  float    px = 8, py = 8, ang = 0;
+  int      hp = DOOM_HP;
+  int      wave = 0, kills = 0, alive = 0, toSpawn = 0;
+  float    spawnIn = 0;
+  uint32_t fireCd = 0, muzzleUntil = 0, hurtUntil = 0, waveBannerUntil = 0;
+  int      best = 0;
+  bool     newRecord = false;
+  bool     over = false;
+  uint32_t overUntil = 0;
+  uint32_t lastOled = 0;
+
+  void  nextWave(uint32_t now);
+  void  spawnFoe();
+  void  tryMove(float dx, float dy);
+  float wallDist(float a) const;
+  void  fire(Ctx& c);
+  void  render(Ctx& c);
+  void  oled(Ctx& c);
+};
+
+// ============================================================
 //  8) SIMON — повтори последовательность (1 игрок)
 //     Лента показывает серию вспышек: зелёная (левая половина) или
 //     синяя (правая). Повторяй кнопками в том же порядке.
@@ -1448,7 +1507,7 @@ private:
 // ============================================================
 class GameManager {
 public:
-  static const int COUNT = 28;
+  static const int COUNT = 29;
 
   GameManager();
 
@@ -1481,6 +1540,7 @@ private:
   DinoGame     _dino;
   MazeGame     _maze;
   TunnelGame   _tunnel;
+  DoomGame     _doom;
   SimonGame    _simon;
   RunnerGame   _runner;
   DefenderGame _defender;

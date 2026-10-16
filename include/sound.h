@@ -41,6 +41,7 @@ extern const MusicTrack MUSIC_DINO;
 extern const MusicTrack MUSIC_RACE;
 extern const MusicTrack MUSIC_MAZE;
 extern const MusicTrack MUSIC_TUNNEL;
+extern const MusicTrack MUSIC_DOOM;
 
 // ---- банки эффектов ----
 extern const SfxBank SND_SHOOTER;
@@ -65,3 +66,4 @@ extern const SfxBank SND_DINO;
 extern const SfxBank SND_RACE;
 extern const SfxBank SND_MAZE;
 extern const SfxBank SND_TUNNEL;
+extern const SfxBank SND_DOOM;
