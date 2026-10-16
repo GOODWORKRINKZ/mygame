@@ -19,10 +19,11 @@
 //           игру, удержание MENU — назад в меню);
 //    Play — идёт игра (MENU выходит, удержание MENU перезапускает).
 //
-//  Кадр фиксированный (FRAME_MS), но кнопки опрашиваются в каждом
-//  проходе loop() и фронты "защёлкиваются" — иначе быстрые нажатия
-//  между кадрами терялись бы. По той же причине кадр OLED уходит по
-//  I2C кусками (Display::pump), а не одним 25-миллисекундным блоком.
+//  Кадр фиксированный (FRAME_MS). Фронты кнопок ловит прерывание и
+//  складывает в очередь; каждый проход loop() разбирает её и
+//  "защёлкивает" фронты до следующего кадра — так быстрые нажатия
+//  между кадрами не теряются, даже если цикл где-то постоял. Кадр OLED
+//  уходит по I2C кусками (Display::pump), а не одним 25-мс блоком.
 
 LedStrip    leds;
 Display     dpy;
@@ -279,8 +280,9 @@ static void runButtonTest() {
   leds.setFullCanvas(false);
   leds.clear();
   leds.show();
-  LOG_I("DIAG", "button test done: P1=%lu P2=%lu MENU=%lu presses",
-        (unsigned long)cnt[0], (unsigned long)cnt[1], (unsigned long)cnt[2]);
+  LOG_I("DIAG", "button test done: P1=%lu P2=%lu MENU=%lu presses, dropped IRQ events=%lu",
+        (unsigned long)cnt[0], (unsigned long)cnt[1], (unsigned long)cnt[2],
+        (unsigned long)Button::droppedEvents());
 }
 
 // ============================================================
@@ -404,6 +406,9 @@ static void updateHelp(const Inputs& in, Ctx& c) {
 void loop() {
   // Кнопки и звук обслуживаем на максимальной частоте: так не теряются
   // короткие нажатия и не рвутся мелодии.
+#if BTN_STRESS_TEST
+  delay(BTN_STRESS_MS);   // имитация тормозящего цикла: фронты всё равно ловит ISR
+#endif
   pollButton(btnP1, latchP1);
   pollButton(btnP2, latchP2);
   pollButton(btnMenu, latchMenu);
