@@ -135,6 +135,12 @@
 #define COLORS_SPEED_MAX    2.6f
 #define COLORS_CLEAR_MS     380    // сколько мигают исчезающие линии
 
+// --- DINO (ДИНО, 1 игрок, матрица 4x4 + 3D на OLED) ---
+#define DINO_LIVES          3
+#define DINO_SPEED_START    2.0f   // рядов в секунду
+#define DINO_SPEED_UP       0.05f  // прибавка за обойдённое препятствие
+#define DINO_SPEED_MAX      6.0f
+
 // --- PONG 2D (понг на матрице, 2 игрока) ---
 // Мяч ходит шагами по клеткам: на 4x4 плавное движение не читается.
 #define PONG2D_STEP_START   420    // мс на одну клетку при подаче

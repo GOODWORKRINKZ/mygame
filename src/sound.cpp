@@ -178,6 +178,12 @@ static const Note T_COLORS[] = {
   {N_A4, E}, {N_C5, E}, {N_E5, Q}, {N_D5, E}, {N_C5, E}, {N_B4, Q},
 };
 
+//  ДИНО — топот по пустыне
+static const Note T_DINO[] = {
+  {N_D4, E}, {N_D4, E}, {N_F4, E}, {N_A4, E}, {N_G4, E}, {N_F4, E}, {N_D4, Q},
+  {N_C4, E}, {N_C4, E}, {N_E4, E}, {N_G4, E}, {N_A4, E}, {N_G4, E}, {N_D4, Q},
+};
+
 const MusicTrack MUSIC_MENU     = makeTrack(T_MENU);
 const MusicTrack MUSIC_TUG      = makeTrack(T_TUG);
 const MusicTrack MUSIC_SHOOTER  = makeTrack(T_SHOOTER);
@@ -201,6 +207,7 @@ const MusicTrack MUSIC_SIEGE    = makeTrack(T_SIEGE);
 const MusicTrack MUSIC_CATCH    = makeTrack(T_CATCH);
 const MusicTrack MUSIC_PONG2D   = makeTrack(T_PONG2D);
 const MusicTrack MUSIC_COLORS   = makeTrack(T_COLORS);
+const MusicTrack MUSIC_DINO     = makeTrack(T_DINO);
 
 // ============================================================
 //  Банки эффектов. Чего нет в банке — звучит стандартно.
@@ -365,6 +372,16 @@ static const SfxOverride B_COLORS[] = {
   SFX_MEL(Click, S_COL_MOVE),
 };
 
+// ДИНО — шаг в сторону глухой, удар о камень, "ух" каждые 5 обойдённых
+static const Note S_DINO_STEP[] = { {300, 10} };
+static const Note S_DINO_HIT[]  = { {180, 60}, {0, 20}, {120, 120} };
+static const Note S_DINO_UH[]   = { {880, 30}, {1175, 50} };
+static const SfxOverride B_DINO[] = {
+  SFX_MEL(Click, S_DINO_STEP),
+  SFX_MEL(Error, S_DINO_HIT),
+  SFX_MEL(Pickup, S_DINO_UH),
+};
+
 const SfxBank SND_SHOOTER  = makeBank(B_SHOOTER);
 const SfxBank SND_PONG     = makeBank(B_PONG);
 const SfxBank SND_DUEL     = makeBank(B_DUEL);
@@ -383,3 +400,4 @@ const SfxBank SND_SIEGE    = makeBank(B_SIEGE);
 const SfxBank SND_CATCH    = makeBank(B_CATCH);
 const SfxBank SND_PONG2D   = makeBank(B_PONG2D);
 const SfxBank SND_COLORS   = makeBank(B_COLORS);
+const SfxBank SND_DINO     = makeBank(B_DINO);
