@@ -98,17 +98,57 @@ void LedStrip::begin() {
     _phys2log[p] = (uint8_t)l;
   }
 
-  resetWall();
+  // 2D-геометрия: каждый физический светодиод должен стоять в сетке ровно
+  // один раз, пути не должны ссылаться за пределы ленты.
+  {
+    uint8_t seen[LED_PHYSICAL_COUNT] = {0};
+    for (int r = 0; r < LED_GRID_ROWS; r++)
+      for (int c = 0; c < LED_GRID_COLS; c++) {
+        uint8_t p = LED_GRID[r][c];
+        if (p == LED_NONE) continue;
+        if (p >= LED_PHYSICAL_COUNT) { LOG_E("LED", "grid[%d][%d]=%u вне ленты", r, c, p); continue; }
+        if (seen[p]++) LOG_W("LED", "grid: физический %u встречается дважды", p);
+      }
+    for (int p = 0; p < LED_PHYSICAL_COUNT; p++)
+      if (!seen[p]) LOG_W("LED", "grid: физический %d не размещён в сетке", p);
+    const Path* paths[] = { &ARM_P1, &ARM_P2, &RING, &CORE };
+    const char* names[] = { "ARM_P1", "ARM_P2", "RING", "CORE" };
+    for (int k = 0; k < 4; k++)
+      for (int i = 0; i < paths[k]->len; i++)
+        if (paths[k]->idx[i] >= LED_PHYSICAL_COUNT)
+          LOG_E("LED", "%s[%d]=%u вне ленты", names[k], i, paths[k]->idx[i]);
+  }
+
   _strip.begin();
   _strip.setBrightness(LED_BRIGHTNESS);
   _strip.clear();
   _strip.show();
+  resetWall();
   clear();
   LOG_I("LED", "strip ready: pin=%d physical=%d logical=%d walls=%d gamma=%d",
         PIN_LED, LED_PHYSICAL_COUNT, LED_COUNT, walls, (int)LED_GAMMA);
+  LOG_I("LED", "geometry: grid %dx%d, arms %d+%d, ring %d, core %d",
+        LED_GRID_COLS, LED_GRID_ROWS, ARM_P1.len, ARM_P2.len, RING.len, CORE.len);
 }
 
-void LedStrip::resetWall() { _wall = rgb(WALL_R, WALL_G, WALL_B); }
+void LedStrip::resetWall() { setWall(rgb(WALL_R, WALL_G, WALL_B)); }
+
+void LedStrip::setWall(Color c) {
+  _wall = c;
+  paintWalls();
+}
+
+void LedStrip::setFullCanvas(bool on) {
+  if (_full == on) return;
+  _full = on;
+  clear();
+}
+
+void LedStrip::paintWalls() {
+  if (_full) return;
+  for (int p = 0; p < LED_PHYSICAL_COUNT; p++)
+    if (_phys2log[p] == NO_LOGICAL) _buf[p] = _wall;
+}
 
 uint8_t LedStrip::physicalOf(int logical) const {
   return (logical >= 0 && logical < LED_COUNT) ? LED_LOGICAL_MAP[logical] : 0;
@@ -119,27 +159,59 @@ bool LedStrip::isWall(int physical) const {
          || _phys2log[physical] == NO_LOGICAL;
 }
 
+// ---- кадр целиком ----
+
 void LedStrip::clear() {
-  for (int i = 0; i < LED_COUNT; i++) _buf[i] = 0;
+  for (int p = 0; p < LED_PHYSICAL_COUNT; p++) _buf[p] = 0;
+  paintWalls();
 }
 
 void LedStrip::fade(uint8_t keep) {
-  for (int i = 0; i < LED_COUNT; i++) _buf[i] = colScale(_buf[i], keep);
+  for (int p = 0; p < LED_PHYSICAL_COUNT; p++) _buf[p] = colScale(_buf[p], keep);
+  paintWalls();
 }
+
+void LedStrip::fillAll(Color c) {
+  if (_full) { for (int p = 0; p < LED_PHYSICAL_COUNT; p++) _buf[p] = c; }
+  else       fill(0, LED_COUNT - 1, c);
+}
+
+void LedStrip::addAll(Color c) {
+  if (_full) { for (int p = 0; p < LED_PHYSICAL_COUNT; p++) addP(p, c); }
+  else       for (int i = 0; i < LED_COUNT; i++) add(i, c);
+}
+
+// ---- физические ----
+
+void LedStrip::setP(int p, Color c) {
+  if (p < 0 || p >= LED_PHYSICAL_COUNT) return;
+  _buf[p] = c;
+}
+
+void LedStrip::addP(int p, Color c) {
+  if (p < 0 || p >= LED_PHYSICAL_COUNT) return;
+  uint16_t r = colR(_buf[p]) + colR(c);
+  uint16_t g = colG(_buf[p]) + colG(c);
+  uint16_t b = colB(_buf[p]) + colB(c);
+  _buf[p] = rgb(r > 255 ? 255 : (uint8_t)r,
+                g > 255 ? 255 : (uint8_t)g,
+                b > 255 ? 255 : (uint8_t)b);
+}
+
+Color LedStrip::getP(int p) const {
+  return (p < 0 || p >= LED_PHYSICAL_COUNT) ? 0 : _buf[p];
+}
+
+// ---- логическая линия ----
 
 void LedStrip::set(int l, Color c) {
   if (l < 0 || l >= LED_COUNT) return;
-  _buf[l] = c;
+  _buf[LED_LOGICAL_MAP[l]] = c;
 }
 
 void LedStrip::add(int l, Color c) {
   if (l < 0 || l >= LED_COUNT) return;
-  uint16_t r = colR(_buf[l]) + colR(c);
-  uint16_t g = colG(_buf[l]) + colG(c);
-  uint16_t b = colB(_buf[l]) + colB(c);
-  _buf[l] = rgb(r > 255 ? 255 : (uint8_t)r,
-                g > 255 ? 255 : (uint8_t)g,
-                b > 255 ? 255 : (uint8_t)b);
+  addP(LED_LOGICAL_MAP[l], c);
 }
 
 // Точка с дробной координатой: яркость делится между двумя соседними
@@ -156,18 +228,66 @@ void LedStrip::fill(int from, int to, Color c) {
   if (from > to) { int t = from; from = to; to = t; }
   if (from < 0) from = 0;
   if (to > LED_COUNT - 1) to = LED_COUNT - 1;
-  for (int i = from; i <= to; i++) _buf[i] = c;
-}
-
-void LedStrip::fillAll(Color c) { fill(0, LED_COUNT - 1, c); }
-
-void LedStrip::addAll(Color c) {
-  for (int i = 0; i < LED_COUNT; i++) add(i, c);
+  for (int i = from; i <= to; i++) _buf[LED_LOGICAL_MAP[i]] = c;
 }
 
 Color LedStrip::get(int l) const {
-  return (l < 0 || l >= LED_COUNT) ? 0 : _buf[l];
+  return (l < 0 || l >= LED_COUNT) ? 0 : _buf[LED_LOGICAL_MAP[l]];
 }
+
+// ---- пути и маршруты ----
+
+void LedStrip::addAA(const Path& p, float pos, Color c) {
+  pos = p.wrap(pos);
+  int i0 = (int)floorf(pos);
+  float f = pos - (float)i0;
+  uint8_t w1 = (uint8_t)(f * 255.0f);
+  addP(p.phys(i0),     colScale(c, (uint8_t)(255 - w1)));
+  addP(p.phys(i0 + 1), colScale(c, w1));
+}
+
+void LedStrip::fill(const Path& p, Color c) {
+  for (int i = 0; i < p.len; i++) setP(p.idx[i], c);
+}
+
+void LedStrip::fade(const Path& p, uint8_t keep) {
+  for (int i = 0; i < p.len; i++) {
+    int ph = p.idx[i];
+    if (ph >= 0 && ph < LED_PHYSICAL_COUNT) _buf[ph] = colScale(_buf[ph], keep);
+  }
+}
+
+void LedStrip::addAA(const Route& r, float pos, Color c) {
+  int i0 = (int)floorf(pos);
+  float f = pos - (float)i0;
+  uint8_t w1 = (uint8_t)(f * 255.0f);
+  addP(r.phys(i0),     colScale(c, (uint8_t)(255 - w1)));
+  addP(r.phys(i0 + 1), colScale(c, w1));
+}
+
+void LedStrip::fill(const Route& r, Color c) {
+  int L = r.length();
+  for (int i = 0; i < L; i++) setP(r.phys(i), c);
+}
+
+// ---- сетка ----
+
+void LedStrip::addAAXY(float x, float y, Color c) {
+  int cx = (int)floorf(x), cy = (int)floorf(y);
+  float fx = x - (float)cx, fy = y - (float)cy;
+  uint8_t wx = (uint8_t)(fx * 255.0f), wy = (uint8_t)(fy * 255.0f);
+  addXY(cx,     cy,     colScale(colScale(c, (uint8_t)(255 - wx)), (uint8_t)(255 - wy)));
+  addXY(cx + 1, cy,     colScale(colScale(c, wx),                 (uint8_t)(255 - wy)));
+  addXY(cx,     cy + 1, colScale(colScale(c, (uint8_t)(255 - wx)), wy));
+  addXY(cx + 1, cy + 1, colScale(colScale(c, wx),                 wy));
+}
+
+void LedStrip::fillRect(int col, int row, int w, int h, Color c) {
+  for (int r = row; r < row + h; r++)
+    for (int k = col; k < col + w; k++) setXY(k, r, c);
+}
+
+// ---- вывод ----
 
 void LedStrip::rawPixel(int physical, Color c) {
   if (physical < 0 || physical >= LED_PHYSICAL_COUNT) return;
@@ -183,12 +303,7 @@ void LedStrip::rawFill(Color c) {
 }
 
 void LedStrip::show() {
-  // Один проход по физической ленте: игровые пиксели берём из кадра,
-  // всё остальное заливаем цветом стен.
-  for (int p = 0; p < LED_PHYSICAL_COUNT; p++) {
-    uint8_t l = _phys2log[p];
-    rawPixel(p, (l == NO_LOGICAL) ? _wall : _buf[l]);
-  }
+  for (int p = 0; p < LED_PHYSICAL_COUNT; p++) rawPixel(p, _buf[p]);
   _strip.show();
 }
 
@@ -245,10 +360,12 @@ void LedStrip::oneByOneTest() {
 void Display::begin() {
   Wire.begin(PIN_OLED_SDA, PIN_OLED_SCL);
   Wire.setClock(400000);
-  _ok = _oled.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR, true, false);
+  _addr = OLED_ADDR;
+  _ok = _oled.begin(SSD1306_SWITCHCAPVCC, _addr, true, false);
   if (!_ok) {
     LOG_W("OLED", "addr 0x%02X not found, trying 0x3D", OLED_ADDR);
-    _ok = _oled.begin(SSD1306_SWITCHCAPVCC, 0x3D, true, false);
+    _addr = 0x3D;
+    _ok = _oled.begin(SSD1306_SWITCHCAPVCC, _addr, true, false);
   }
   if (!_ok) {
     LOG_E("OLED", "SSD1306 not found! check SDA=%d SCL=%d", PIN_OLED_SDA, PIN_OLED_SCL);
@@ -291,15 +408,56 @@ static int utf8ToFontCodes(const char* s, uint8_t* out, int cap) {
 
 void Display::clear() { _oled.clearDisplay(); }
 
+// Кадр не отправляется целиком: display() у Adafruit держит шину ~25 мс,
+// и всё это время loop() стоит — кнопки не опрашиваются, короткий тап
+// теряется. Вместо этого снимаем копию кадра и отдаём её pump()'у по
+// 127 байт за вызов (одна I2C-транзакция, ~3 мс).
 void Display::flush() {
+  if (!_ok) return;
   uint32_t now = millis();
-  if (now - _lastFlush >= OLED_MIN_MS) {
-    _lastFlush = now;
-    _oled.display();
+  if (now - _lastFlush < OLED_MIN_MS) return;
+  if (_txLeft) return;          // предыдущий кадр ещё уходит — не рвать его, доотправим
+  _lastFlush = now;
+  memcpy(_tx, _oled.getBuffer(), FRAME_BYTES);
+  _txPos = 0;
+  _txLeft = FRAME_BYTES;
+  _txHeaderSent = false;
+}
+
+void Display::pump() {
+  if (!_ok || _txLeft == 0) return;
+
+  if (!_txHeaderSent) {
+    // Adafruit после каждой своей транзакции возвращает шину на 100 кГц
+    // (TRANSACTION_END -> clkAfter). Нам нужны 400 кГц, иначе кадр идёт
+    // ~100 мс и не успевает дойти до нижних страниц между flush().
+    Wire.setClock(400000);
+    // Адресное окно на весь экран: страницы 0..7, столбцы 0..127.
+    Wire.beginTransmission(_addr);
+    Wire.write((uint8_t)0x00);                 // далее команды
+    Wire.write((uint8_t)SSD1306_PAGEADDR);
+    Wire.write((uint8_t)0x00);
+    Wire.write((uint8_t)0xFF);
+    Wire.write((uint8_t)SSD1306_COLUMNADDR);
+    Wire.write((uint8_t)0x00);
+    Wire.write((uint8_t)(OLED_WIDTH - 1));
+    Wire.endTransmission();
+    _txHeaderSent = true;
+    return;
   }
+
+  uint16_t n = _txLeft < CHUNK ? _txLeft : CHUNK;
+  Wire.beginTransmission(_addr);
+  Wire.write((uint8_t)0x40);                   // далее данные
+  Wire.write(_tx + _txPos, n);
+  Wire.endTransmission();
+  _txPos  += n;
+  _txLeft -= n;
 }
 
 void Display::flushNow() {
+  if (!_ok) return;
+  _txLeft = 0;                                 // недосланный кадр больше не нужен
   _lastFlush = millis();
   _oled.display();
 }
@@ -510,7 +668,11 @@ void Button::update() {
     _lastDebounceTime = now;
     _lastDebounceRaw = nowRaw;
   }
-  bool stable = (now - _lastDebounceTime >= BTN_DEBOUNCE_MS) ? nowRaw : _raw;
+  // Нажатие подтверждаем быстро, отпускание — дольше: пружинные
+  // аркадные кнопки дребезжат в основном на отпускании, а лишний
+  // "фронт" там выглядит как двойное нажатие или залипание.
+  uint32_t need = nowRaw ? BTN_PRESS_MS : BTN_RELEASE_MS;
+  bool stable = (now - _lastDebounceTime >= need) ? nowRaw : _raw;
 
   _pressed  = stable && !_raw;
   _released = !stable && _raw;
@@ -519,6 +681,7 @@ void Button::update() {
     _pressStart = now;
     _longFired = false;
     _longFlag = false;
+    _stuckWarned = false;
     _nextRepeat = 0;
   }
   if (_released) _lastHeld = now - _pressStart;
@@ -528,6 +691,14 @@ void Button::update() {
   if (_raw && !_longFired && (now - _pressStart) >= BTN_LONG_MS) {
     _longFired = true;
     _longFlag = true;
+  }
+
+  // Кнопка "нажата" неправдоподобно долго — почти наверняка залипла
+  // физически. Пишем один раз за нажатие, чтобы было видно в логе.
+  if (_raw && !_stuckWarned && (now - _pressStart) >= BTN_STUCK_WARN_MS) {
+    _stuckWarned = true;
+    LOG_W("BTN", "pin %u reads LOW for %lu ms — stuck button? (wiring NC/NO, cap, short)",
+          _pin, (unsigned long)(now - _pressStart));
   }
 }
 
@@ -541,10 +712,11 @@ bool Button::longPress() {
   return r;
 }
 
-bool Button::repeat(uint16_t firstMs, uint16_t rateMs) {
-  if (_pressed) { _nextRepeat = millis() + firstMs; return true; }
-  if (_raw && _nextRepeat && millis() >= _nextRepeat) {
-    _nextRepeat = millis() + rateMs;
+bool Button::repeat(bool pressedNow, uint16_t firstMs, uint16_t rateMs) {
+  uint32_t now = millis();
+  if (pressedNow) { _nextRepeat = now + firstMs; return true; }
+  if (_raw && _nextRepeat && now >= _nextRepeat) {
+    _nextRepeat = now + rateMs;
     return true;
   }
   return false;

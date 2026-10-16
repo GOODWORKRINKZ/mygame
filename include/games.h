@@ -251,6 +251,56 @@ private:
 };
 
 // ============================================================
+//  6b) ORBIT — орбита (2 игрока, вся лента: рукав -> кольцо -> рукав)
+//      Комета вылетает от твоей кнопки, кружит по кольцу матрицы и
+//      вылетает к сопернику. Отбей у своей кнопки, пока не улетела.
+// ============================================================
+class OrbitGame : public Game {
+public:
+  const char* name() const override { return "ОРБИТА"; }
+  const char* hint() const override { return "ОТБЕЙ У СВОЕЙ КНОПКИ"; }
+  Color theme() const override { return rgb(255, 170, 0); }
+  bool  fullCanvas() const override { return true; }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "2 ИГРОКА",
+      "КОМЕТА ЛЕТИТ К ЦЕНТРУ",
+      "КРУЖИТ В МАТРИЦЕ",
+      "И ВЫЛЕТАЕТ К ВРАГУ",
+      "ЦЕНТР ПОКАЖЕТ КРУГИ",
+      "ЖМИ, КОГДА ОНА У",
+      "ТВОЕЙ КНОПКИ, 3 ТОЧКИ",
+      "РАНО = ШТРАФ",
+      "ПРОЗЕВАЛ = ОЧКО ВРАГУ",
+      "МАТЧ ДО 3 ПОБЕД",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
+  void reset() override;
+  void update(const Inputs& in, Ctx& c) override;
+
+private:
+  Match    m;
+  Route    route;                 // текущий маршрут кометы
+  float    pos = 0;               // координата на маршруте
+  float    speed = ORBIT_SPEED_START;
+  int      from = 1;              // кто запустил комету (1 или 2)
+  int      laps = 0;              // кругов по кольцу в этом пролёте
+  int      volleys = 0;
+  uint32_t serveAt = 0;
+  uint32_t stun[2] = {0, 0};
+  const char* event = "";
+
+  void buildRoute(int fromP, int lapsN, int dirCw);
+  void serve(int fromP, uint32_t now);
+  void newRound(uint32_t now);
+  bool inZone() const;
+  int  lapsLeft() const;
+  void render(Ctx& c);
+  void oled(Ctx& c);
+};
+
+// ============================================================
 //  7) SNIPER — меткость (1 игрок)
 //     Курсор мечется по ленте, светится зона-мишень. Жми ровно
 //     когда курсор внутри. Попал — зона уже, курсор быстрее.
@@ -312,8 +362,10 @@ public:
       "1 ИГРОК",
       "СМОТРИ ВСПЫШКИ",
       "ПОВТОРИ КНОПКАМИ",
-      "ЛЕВО = ЗЕЛЕНАЯ",
-      "ПРАВО = СИНЯЯ",
+      "ЗЕЛЕНАЯ ПОЛОВИНА =",
+      "ЗЕЛЕНАЯ КНОПКА, СИНЯЯ",
+      "ПОЛОВИНА = СИНЯЯ",
+      "ДУМАЙ НЕ ДОЛЬШЕ 4 СЕК",
       "ОШИБКА = КОНЕЦ",
     };
     return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
@@ -464,7 +516,7 @@ private:
 class TrafficGame : public Game {
 public:
   const char* name() const override { return "СТОП-СИГНАЛ"; }
-  const char* hint() const override { return "ЗЕЛЕНОЕ ЖМИ, КРАСНОЕ НЕТ"; }
+  const char* hint() const override { return "ЗЕЛ. ЖМИ, КРАСН. НЕТ"; }
   Color theme() const override { return rgb(0, 255, 40); }
   RuleText rules() const override {
     static const char* L[] = {
@@ -563,11 +615,11 @@ public:
       "2 ИГРОКА",
       "ДЕРЖИ КНОПКУ -",
       "ПОЛОСКА РАСТЕТ",
-      "ДЛИННЕЕ = БОЛЬШЕ ОЧКОВ",
+      "ДЛИННЕЕ = БОЛЬШЕ ОЧКИ",
       "ГДЕ-ТО СПРЯТАНА МИНА",
       "ОТПУСТИЛ = В БАНК",
       "ДОЖАЛ ДО МИНЫ = НОЛЬ",
-      "БАНК БОЛЬШЕ = РАУНД ТВОЙ",
+      "БОЛЬШЕ БАНК = РАУНД",
     };
     return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
   }
@@ -600,7 +652,7 @@ private:
 class ChaseGame : public Game {
 public:
   const char* name() const override { return "ДОГОНЯЛКИ"; }
-  const char* hint() const override { return "ЛЕНТА ЗАМКНУТА В КОЛЬЦО"; }
+  const char* hint() const override { return "ЛЕНТА = КОЛЬЦО"; }
   Color theme() const override { return rgb(255, 0, 200); }
   RuleText rules() const override {
     static const char* L[] = {
@@ -611,7 +663,8 @@ public:
       "ДОГНАЛ ВОВРЕМЯ -",
       "ОЧКО ОХОТНИКУ",
       "УБЕЖАЛ - ОЧКО БЕГЛЕЦУ",
-      "РОЛИ МЕНЯЮТСЯ КАЖДЫЙ РАУНД",
+      "РОЛИ МЕНЯЮТСЯ КАЖДЫЙ",
+      "РАУНД",
     };
     return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
   }
@@ -690,17 +743,20 @@ private:
 class TowerGame : public Game {
 public:
   const char* name() const override { return "БАШНЯ"; }
-  const char* hint() const override { return "ЖМИ РОВНО НАД ЭТАЖОМ"; }
+  const char* hint() const override { return "СТОП НАД ПЛОЩАДКОЙ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(0, 200, 255); }
   RuleText rules() const override {
     static const char* L[] = {
       "1 ИГРОК",
-      "БЛОК ЕЗДИТ ПО ЛЕНТЕ",
-      "ЗЕЛЕНАЯ = ПОСТАВИТЬ",
-      "ЛИШНЕЕ ОТВАЛИВАЕТСЯ",
-      "БЛОК СТАНОВИТСЯ УЖЕ",
-      "МИМО ЭТАЖА = КОНЕЦ",
+      "ЯРКИЙ БЛОК ЕЗДИТ",
+      "СЕРАЯ ПЛОЩАДКА = ЭТАЖ",
+      "ЖМИ, КОГДА БЛОК",
+      "СТОИТ НАД ПЛОЩАДКОЙ",
+      "ЧТО ВЫЛЕЗЛО - ОТПАДЕТ",
+      "БЛОК СТАНЕТ УЖЕ",
+      "ТОЧНО = БОНУС",
+      "СОВСЕМ МИМО = КОНЕЦ",
     };
     return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
   }
@@ -734,17 +790,19 @@ private:
 class SnakeGame : public Game {
 public:
   const char* name() const override { return "ЗМЕЙКА"; }
-  const char* hint() const override { return "ЗЕЛ=РАЗВОРОТ СИН=РЫВОК"; }
+  const char* hint() const override { return "ЗЕЛ=РАЗВОРОТ СИН=ГАЗ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(60, 255, 0); }
   RuleText rules() const override {
     static const char* L[] = {
       "1 ИГРОК",
       "ЛЕНТА = КОЛЬЦО",
+      "ЗМЕЯ ПОЛЗЕТ САМА",
       "ЗЕЛЕНАЯ = РАЗВОРОТ",
-      "СИНЯЯ = УСКОРЕНИЕ",
+      "ХВОСТ СТАНЕТ ГОЛОВОЙ",
+      "СИНЯЯ = ДЕРЖИ, РЫВОК",
       "ЕШЬ ЖЕЛТУЮ ЕДУ",
-      "ПОСЛЕ ЕДЫ РАСТЕТ КАМЕНЬ",
+      "ЗА ЕДУ ПАДАЕТ КАМЕНЬ",
       "КАМЕНЬ ИЛИ ХВОСТ =",
       "КОНЕЦ ИГРЫ",
     };
@@ -851,7 +909,7 @@ public:
       "НАВСТРЕЧУ ДРУГ ДРУГУ",
       "ЖМИТЕ ОБА В МОМЕНТ",
       "ВСТРЕЧИ В ЦЕНТРЕ",
-      "ОКНО СУЖАЕТСЯ С УРОВНЕМ",
+      "ОКНО ВСЕ УЖЕ И УЖЕ",
       "3 ОШИБКИ = КОНЕЦ",
     };
     return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
@@ -947,7 +1005,7 @@ private:
 // ============================================================
 class GameManager {
 public:
-  static const int COUNT = 20;
+  static const int COUNT = 21;
 
   GameManager();
 
@@ -971,6 +1029,7 @@ private:
   DuelGame     _duel;
   SprintGame   _sprint;
   BombGame     _bomb;
+  OrbitGame    _orbit;
   SniperGame   _sniper;
   SimonGame    _simon;
   RunnerGame   _runner;

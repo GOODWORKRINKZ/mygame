@@ -20,7 +20,8 @@
 //
 //  Кадр фиксированный (FRAME_MS), но кнопки опрашиваются в каждом
 //  проходе loop() и фронты "защёлкиваются" — иначе быстрые нажатия
-//  между кадрами терялись бы.
+//  между кадрами терялись бы. По той же причине кадр OLED уходит по
+//  I2C кусками (Display::pump), а не одним 25-миллисекундным блоком.
 
 LedStrip    leds;
 Display     dpy;
@@ -42,12 +43,13 @@ struct Latch {
   bool     pressed = false;
   bool     released = false;
   uint32_t lastHeld = 0;
+  uint32_t pressedAt = 0;
 };
 static Latch latchP1, latchP2, latchMenu;
 
 static void pollButton(Button& b, Latch& l) {
   b.update();
-  if (b.pressed())  l.pressed = true;
+  if (b.pressed())  { l.pressed = true; l.pressedAt = b.pressedAt(); }
   if (b.released()) { l.released = true; l.lastHeld = b.lastHeldMs(); }
 }
 
@@ -57,6 +59,7 @@ static void fillBtn(BtnState& s, Button& b, Latch& l) {
   s.held       = b.held();
   s.heldMs     = b.heldMs();
   s.lastHeldMs = l.lastHeld;
+  s.pressedAt  = l.pressedAt;
   l.pressed = l.released = false;
 }
 
@@ -68,6 +71,7 @@ static void previewLeds(Ctx& c, Game* g, bool allowIdle);
 static void updateMenu(const Inputs& in, Ctx& c);
 static void updateHelp(const Inputs& in, Ctx& c);
 static void runDiagnostics();
+static void runButtonTest();
 
 // ============================================================
 //  setup
@@ -181,6 +185,83 @@ static void runDiagnostics() {
   leds.oneByOneTest();
 
   LOG_I("DIAG", "strip diagnostics done");
+
+  // 4) живой тест кнопок — пока не отпустят удержанием MENU
+  runButtonTest();
+}
+
+// ============================================================
+//  Тест кнопок: сырой уровень на ноге, счётчик нажатий и длительность
+//  последнего. Нужен, чтобы отличить железное залипание (уровень на
+//  ноге остаётся LOW после отпускания) от программного.
+//  Рукав зелёного горит, пока нога P1 читается LOW; рукав синего — P2;
+//  середина — MENU. Выход — удержание MENU.
+// ============================================================
+static void runButtonTest() {
+  LOG_I("DIAG", "button test: P1=GPIO%d P2=GPIO%d MENU=GPIO%d, hold MENU to exit",
+        PIN_BTN_P1, PIN_BTN_P2, PIN_BTN_MENU);
+
+  // мы попали сюда удержанием MENU — дождёмся, пока её отпустят
+  while (digitalRead(PIN_BTN_MENU) == LOW) delay(5);
+  btnMenu.update();
+  btnMenu.longPress();
+
+  Button* btn[3] = { &btnP1, &btnP2, &btnMenu };
+  const char* nm[3] = { "ЗЕЛ", "СИН", "МЕНЮ" };
+  uint32_t cnt[3] = {0, 0, 0}, lastDur[3] = {0, 0, 0};
+  uint32_t lastDraw = 0;
+
+  for (;;) {
+    for (int i = 0; i < 3; i++) {
+      btn[i]->update();
+      if (btn[i]->pressed())  { cnt[i]++; LOG_D("BTN", "%s down", nm[i]); }
+      if (btn[i]->released()) {
+        lastDur[i] = btn[i]->lastHeldMs();
+        LOG_D("BTN", "%s up after %lu ms", nm[i], (unsigned long)lastDur[i]);
+      }
+    }
+    if (btnMenu.longPress()) break;
+
+    bool r1 = digitalRead(PIN_BTN_P1) == LOW;
+    bool r2 = digitalRead(PIN_BTN_P2) == LOW;
+    bool rm = digitalRead(PIN_BTN_MENU) == LOW;
+
+    leds.setFullCanvas(true);
+    leds.clear();
+    leds.fill(ARM_P1, r1 ? COL_P1 : colScale(COL_P1, 18));
+    leds.fill(ARM_P2, r2 ? COL_P2 : colScale(COL_P2, 18));
+    leds.fill(CORE,   rm ? rgb(255, 255, 255) : rgb(12, 12, 12));
+    // антидребезг согласен с ногой? если нет — кольцо подсвечивает рассинхрон
+    bool mismatch = (r1 != btnP1.held()) || (r2 != btnP2.held());
+    leds.fill(RING, mismatch ? rgb(120, 60, 0) : rgb(4, 4, 6));
+    leds.show();
+
+    uint32_t now = millis();
+    if (now - lastDraw >= 100) {
+      lastDraw = now;
+      dpy.clear();
+      dpy.textCentered(1, "ТЕСТ КНОПОК", 1);
+      dpy.gfx().drawFastHLine(0, 15, OLED_WIDTH, SSD1306_WHITE);
+      bool raw[3] = { r1, r2, rm };
+      for (int i = 0; i < 3; i++) {
+        char line[26];
+        snprintf(line, sizeof line, "%-4s %s N%-3lu %4luМС", nm[i],
+                 raw[i] ? "НАЖ" : "---", (unsigned long)cnt[i], (unsigned long)lastDur[i]);
+        dpy.text(2, 18 + i * 9, line, 1);
+      }
+      dpy.textCentered(45, mismatch ? "ДРЕБЕЗГ/РАССИНХРОН" : "НАЖ = НОГА НА GND", 1);
+      dpy.textCentered(57, "УДЕРЖИ МЕНЮ = ВЫХОД", 1);
+      dpy.flush();
+    }
+    dpy.pump();
+    delay(1);
+  }
+
+  leds.setFullCanvas(false);
+  leds.clear();
+  leds.show();
+  LOG_I("DIAG", "button test done: P1=%lu P2=%lu MENU=%lu presses",
+        (unsigned long)cnt[0], (unsigned long)cnt[1], (unsigned long)cnt[2]);
 }
 
 // ============================================================
@@ -190,6 +271,7 @@ static void enterMenu() {
   state = AppState::Menu;
   fx.reset();
   out.silence();
+  leds.setFullCanvas(false);
   lastInput = millis();
   LOG_I("APP", "menu, cursor on %s", manager.now()->name());
 }
@@ -199,6 +281,7 @@ static void enterHelp() {
   helpPage = 0;
   fx.reset();
   out.silence();
+  leds.setFullCanvas(false);
   lastInput = millis();
   LOG_I("APP", "help for %s", manager.now()->name());
 }
@@ -207,6 +290,7 @@ static void enterPlay() {
   state = AppState::Play;
   fx.reset();
   leds.resetWall();          // меню подкрашивает стены — возвращаем как было
+  leds.setFullCanvas(manager.now()->fullCanvas());
   manager.resetCurrent();
   LOG_I("APP", "start %s (%dP)", manager.now()->name(), manager.now()->players());
 }
@@ -265,11 +349,11 @@ static void updateHelp(const Inputs& in, Ctx& c) {
   }
   if (helpPage >= pageCount) helpPage = pageCount - 1;
 
-  if ((in.p1.pressed || btnP1.repeat()) && pageCount > 1) {
+  if (btnP1.repeat(in.p1.pressed) && pageCount > 1) {
     helpPage = (uint8_t)((helpPage + 1) % pageCount);
     out.sfx(Sfx::Click);
   }
-  if ((in.p2.pressed || btnP2.repeat()) && pageCount > 1) {
+  if (btnP2.repeat(in.p2.pressed) && pageCount > 1) {
     helpPage = (uint8_t)(helpPage == 0 ? pageCount - 1 : helpPage - 1);
     out.sfx(Sfx::Click);
   }
@@ -298,6 +382,7 @@ void loop() {
   pollButton(btnP2, latchP2);
   pollButton(btnMenu, latchMenu);
   out.update();
+  dpy.pump();          // кадр OLED уходит по I2C кусками, между опросами кнопок
 
   uint32_t now = millis();
   if (now - lastFrame < FRAME_MS) return;
@@ -324,8 +409,8 @@ void loop() {
   switch (state) {
     case AppState::Menu:
       // Зелёная (физически справа) — листает ВНИЗ, синяя (слева) — ВВЕРХ.
-      if (in.p1.pressed || btnP1.repeat()) { manager.next(); out.sfx(Sfx::Click); }
-      if (in.p2.pressed || btnP2.repeat()) { manager.prev(); out.sfx(Sfx::Click); }
+      if (btnP1.repeat(in.p1.pressed)) { manager.next(); out.sfx(Sfx::Click); }
+      if (btnP2.repeat(in.p2.pressed)) { manager.prev(); out.sfx(Sfx::Click); }
       if (menuShort) { out.sfx(Sfx::Select); enterHelp(); break; }
       if (menuLong)  { runDiagnostics(); lastFrame = millis(); }
       updateMenu(in, c);

@@ -42,8 +42,10 @@ void DuelGame::update(const Inputs& in, Ctx& c) {
 
     case Ph::Wait: {
       // фальстарт
+      // оба дёрнулись в одном кадре — виноват тот, кто раньше по времени
       int early = 0;
-      if (in.p1.pressed) early = 1;
+      if (in.p1.pressed && in.p2.pressed) early = (in.p1.pressedAt <= in.p2.pressedAt) ? 1 : 2;
+      else if (in.p1.pressed) early = 1;
       else if (in.p2.pressed) early = 2;
       if (early) {
         falseStart = true;
@@ -63,9 +65,16 @@ void DuelGame::update(const Inputs& in, Ctx& c) {
     }
 
     case Ph::Go: {
+      // Время реакции берём по фронту нажатия, а не по началу кадра:
+      // так честно решаются и нажатия внутри одного кадра (16 мс).
       int winner = 0;
-      if (in.p1.pressed) { rt[0] = (int)(c.now - goAt); winner = 1; }
-      else if (in.p2.pressed) { rt[1] = (int)(c.now - goAt); winner = 2; }
+      if (in.p1.pressed) rt[0] = (int)(in.p1.pressedAt - goAt);
+      if (in.p2.pressed) rt[1] = (int)(in.p2.pressedAt - goAt);
+      if (in.p1.pressed && in.p2.pressed) winner = (rt[0] <= rt[1]) ? 1 : 2;
+      else if (in.p1.pressed) winner = 1;
+      else if (in.p2.pressed) winner = 2;
+      if (rt[0] < 0 && in.p1.pressed) rt[0] = 0;
+      if (rt[1] < 0 && in.p2.pressed) rt[1] = 0;
       if (winner) {
         c.fx.burst(winner == 1 ? 1.0f : LED_COUNT - 2.0f,
                    winner == 1 ? COL_P1 : COL_P2, 12, 26.0f);
@@ -115,7 +124,7 @@ void DuelGame::render(Ctx& c) {
 static void rtText(char* dst, size_t n, int v) {
   if (v == -2)      snprintf(dst, n, "ФОЛС!");
   else if (v < 0)   snprintf(dst, n, "--");
-  else              snprintf(dst, n, "%dмс", v);
+  else              snprintf(dst, n, "%dМС", v);
 }
 
 void DuelGame::oled(Ctx& c) {

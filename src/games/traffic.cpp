@@ -42,7 +42,10 @@ void TrafficGame::update(const Inputs& in, Ctx& c) {
 
     case Ph::Wait: {
       // дёрнулся до сигнала — очко сопернику
-      int early = in.p1.pressed ? 1 : (in.p2.pressed ? 2 : 0);
+      int early = 0;
+      if (in.p1.pressed && in.p2.pressed) early = (in.p1.pressedAt <= in.p2.pressedAt) ? 1 : 2;
+      else if (in.p1.pressed) early = 1;
+      else if (in.p2.pressed) early = 2;
       if (early) {
         rt[early - 1] = -2;
         c.out.sfx(Sfx::Error);
@@ -61,9 +64,13 @@ void TrafficGame::update(const Inputs& in, Ctx& c) {
     }
 
     case Ph::Signal: {
-      int hit = in.p1.pressed ? 1 : (in.p2.pressed ? 2 : 0);
+      int hit = 0;
+      if (in.p1.pressed && in.p2.pressed) hit = (in.p1.pressedAt <= in.p2.pressedAt) ? 1 : 2;
+      else if (in.p1.pressed) hit = 1;
+      else if (in.p2.pressed) hit = 2;
       if (hit) {
-        int dt = (int)(c.now - signalAt);
+        uint32_t at = (hit == 1) ? in.p1.pressedAt : in.p2.pressedAt;
+        int dt = (at > signalAt) ? (int)(at - signalAt) : 0;
         if (redLight) {
           // на красный жать нельзя — очко сопернику
           rt[hit - 1] = -2;
@@ -128,7 +135,7 @@ void TrafficGame::render(Ctx& c) {
 static void trafficRt(char* dst, size_t n, int v) {
   if (v == -2)    snprintf(dst, n, "ОШИБКА");
   else if (v < 0) snprintf(dst, n, "--");
-  else            snprintf(dst, n, "%dмс", v);
+  else            snprintf(dst, n, "%dМС", v);
 }
 
 void TrafficGame::oled(Ctx& c) {
