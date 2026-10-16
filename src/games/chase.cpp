@@ -2,25 +2,19 @@
 #include <math.h>
 
 // ============================================================
-//  CHASE — догонялки по кольцу
+//  CHASE — догонялки по кольцу матрицы
 // ============================================================
-//  Единственная игра, где лента считается замкнутой: с последнего
-//  светодиода сразу попадаешь на нулевой. Один игрок убегает,
-//  второй догоняет, оба разгоняются нажатиями (скорость гаснет,
-//  как в СПРИНТЕ), но охотник чуть резвее. Не догнал за отведённое
-//  время — очко беглецу. Роли меняются каждый раунд, поэтому матч
-//  честный: побегать охотником успеют оба.
+//  Раньше "кольцом" считалась вся лента, и переход с последнего
+//  светодиода на нулевой был прыжком через весь стол. Теперь трасса —
+//  настоящее кольцо: периметр матрицы 4x4 (12 клеток, RING). Один
+//  убегает, второй догоняет, оба разгоняются нажатиями (скорость
+//  гаснет, как в СПРИНТЕ), охотник чуть резвее. Фора — полкольца.
+//  Рукава игроков показывают их текущую скорость, сердцевина —
+//  сколько времени осталось у охотника. Роли меняются каждый раунд.
 
-static inline float ringWrap(float p) {
-  while (p >= (float)LED_COUNT) p -= (float)LED_COUNT;
-  while (p < 0.0f)              p += (float)LED_COUNT;
-  return p;
-}
-
-// Расстояние "вперёд по кольцу" от a до b.
-static inline float ringAhead(float a, float b) {
-  return ringWrap(b - a);
-}
+static const float RING_LEN = (float)RING.len;
+static const float HALF     = RING_LEN / 2.0f;
+static const float VEL_FULL = 11.0f;     // скорость, при которой шкала рукава полная
 
 void ChaseGame::reset() {
   m.reset();
@@ -31,13 +25,14 @@ void ChaseGame::newRound(uint32_t now) {
   hunter = (m.round % 2 == 1) ? 2 : 1;      // первый раунд догоняет синий
   int runner = 3 - hunter;
 
-  pos[hunter - 1] = 0.0f;
-  pos[runner - 1] = LED_COUNT / 2.0f;       // фора ровно полкольца
+  // охотник стартует у своих ворот, беглец — у противоположных (фора полкольца)
+  pos[hunter - 1] = (float)((hunter == 1) ? RING_GATE_P1 : RING_GATE_P2);
+  pos[runner - 1] = RING.wrap(pos[hunter - 1] + HALF);
   vel[0] = vel[1] = 0.0f;
 
   startAt = now + 1400;
   endAt = startAt + CHASE_TIME_MS;
-  gap = LED_COUNT / 2.0f;
+  gap = HALF;
 }
 
 void ChaseGame::update(const Inputs& in, Ctx& c) {
@@ -67,24 +62,24 @@ void ChaseGame::update(const Inputs& in, Ctx& c) {
                                       : CHASE_IMPULSE;
       vel[p] += boost;
       c.out.tone((uint16_t)(480 + (int)(vel[p] * 26)), 14);
-      c.fx.spark(pos[p], -6.0f, p == 0 ? COL_P1 : COL_P2, 0.18f);
+      c.fx.spark(pos[p], -6.0f, p == 0 ? COL_P1 : COL_P2, 0.18f, &RING);
     }
     vel[p] -= vel[p] * CHASE_FRICTION * c.dt;
     if (vel[p] < 0) vel[p] = 0;
-    pos[p] = ringWrap(pos[p] + vel[p] * c.dt);
+    pos[p] = RING.wrap(pos[p] + vel[p] * c.dt);
   }
 
   int runner = 3 - hunter;
-  gap = ringAhead(pos[hunter - 1], pos[runner - 1]);
+  gap = RING.ahead(pos[hunter - 1], pos[runner - 1]);
 
   // ---- поймал ----
-  if (gap <= CHASE_CATCH_DIST || gap >= LED_COUNT - CHASE_CATCH_DIST) {
-    c.fx.burst(pos[hunter - 1], hunter == 1 ? COL_P1 : COL_P2, 14, 28.0f);
+  if (gap <= CHASE_CATCH_DIST || gap >= RING_LEN - CHASE_CATCH_DIST) {
+    c.fx.burst(pos[hunter - 1], hunter == 1 ? COL_P1 : COL_P2, 14, 20.0f, &RING);
     c.out.buzz(90);
     m.winRound(hunter, c.now, c);
   } else if (c.now >= endAt) {
     // ---- время вышло, беглец ушёл ----
-    c.fx.burst(pos[runner - 1], runner == 1 ? COL_P1 : COL_P2, 14, 28.0f);
+    c.fx.burst(pos[runner - 1], runner == 1 ? COL_P1 : COL_P2, 14, 20.0f, &RING);
     m.winRound(runner, c.now, c);
   }
 
@@ -94,32 +89,59 @@ void ChaseGame::update(const Inputs& in, Ctx& c) {
 
 void ChaseGame::render(Ctx& c) {
   LedStrip& L = c.leds;
-  L.fade(120);                 // хвосты: по ним видно, кто разогнался
+  L.fade(120);                 // хвосты на кольце: видно, кто разогнался
+  // рукава и сердцевина перерисовываются целиком, хвосты нужны только трассе
+  L.fill(ARM_P1, 0);
+  L.fill(ARM_P2, 0);
 
   int runner = 3 - hunter;
-  bool close = (gap < 4.0f);
+  bool close = (gap < 2.5f);
 
-  // тусклое кольцо-дорожка
-  for (int i = 0; i < LED_COUNT; i++) L.add(i, rgb(3, 3, 5));
+  // ---- трасса: тусклое кольцо ----
+  for (int i = 0; i < RING.len; i++) L.add(RING, i, rgb(3, 3, 5));
 
-  // беглец
-  Color rc = (runner == 1) ? COL_P1 : COL_P2;
-  L.addAA(pos[runner - 1], rc);
+  // ---- шкалы скорости в рукавах: от кнопки к матрице ----
+  for (int p = 0; p < 2; p++) {
+    const Path& arm = (p == 0) ? ARM_P1 : ARM_P2;
+    Color col = (p == 0) ? COL_P1 : COL_P2;
+    float lit = (vel[p] / VEL_FULL) * arm.len;
+    for (int i = 0; i < arm.len; i++) {
+      float f = lit - i;
+      uint8_t b = f >= 1.0f ? 160 : (f > 0 ? (uint8_t)(f * 160) : 0);
+      L.set(arm, i, colScale(col, (uint8_t)(10 + b)));
+    }
+    // у ворот — метка, чей это вход
+    L.add(arm, arm.len - 1, colScale(col, 30));
+  }
 
-  // охотник: при сближении начинает мигать — обоим слышно и видно
+  // ---- сердцевина: остаток времени охотника, цвет охотника ----
   Color hc = (hunter == 1) ? COL_P1 : COL_P2;
+  Color rc = (runner == 1) ? COL_P1 : COL_P2;
+  if (!startAt) {
+    uint32_t left = (endAt > c.now) ? endAt - c.now : 0;
+    float k = (float)left / (float)CHASE_TIME_MS;              // 1 -> 0
+    uint8_t rate = (uint8_t)(2 + (1.0f - k) * 8.0f);
+    uint8_t pulse = sin8((uint8_t)(c.now * rate / 8));
+    L.fill(CORE, colScale(hc, (uint8_t)(20 + (uint16_t)pulse * k * 120 / 255 + (1.0f - k) * 40)));
+  }
+
+  // ---- беглец ----
+  L.addAA(RING, pos[runner - 1], rc);
+
+  // ---- охотник: при сближении мигает белым ----
   if (close) {
     uint8_t b = ((c.now / 60) & 1) ? 255 : 120;
-    L.addAA(pos[hunter - 1], colScale(rgb(255, 255, 255), b));
+    L.addAA(RING, pos[hunter - 1], colScale(rgb(255, 255, 255), b));
   }
-  L.addAA(pos[hunter - 1], hc);
-  L.addAA(pos[hunter - 1] - 0.9f, colScale(hc, 60));
+  L.addAA(RING, pos[hunter - 1], hc);
+  L.addAA(RING, pos[hunter - 1] - 0.9f, colScale(hc, 60));
 
-  // обратный отсчёт: кольцо дышит белым
+  // ---- обратный отсчёт: кольцо и сердцевина дышат белым ----
   if (startAt) {
     uint32_t left = (startAt > c.now) ? startAt - c.now : 0;
     uint8_t b = (uint8_t)(40 + (left % 400) * 120 / 400);
-    L.addAll(colScale(rgb(60, 60, 60), b));
+    for (int i = 0; i < RING.len; i++) L.add(RING, i, colScale(rgb(60, 60, 60), b));
+    L.fill(CORE, colScale(rgb(60, 60, 60), b));
   }
 }
 
@@ -146,7 +168,7 @@ void ChaseGame::oled(Ctx& c) {
   } else {
     uint32_t left = (endAt > c.now) ? (endAt - c.now) / 100 : 0;
     snprintf(foot, sizeof foot, "%lu.%lu СЕК  РАЗРЫВ %d",
-             (unsigned long)(left / 10), (unsigned long)(left % 10), (int)gap);
+             (unsigned long)(left / 10), (unsigned long)(left % 10), (int)(gap + 0.5f));
   }
 
   drawMatchOled(c, name(), m, l, r, f);

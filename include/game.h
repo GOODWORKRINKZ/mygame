@@ -71,6 +71,12 @@ public:
   // сердцевина матрицы — см. canvas.h), стен у неё нет. Одномерные
   // игры оставляют false и видят привычную логическую линию с рамкой.
   virtual bool    fullCanvas() const { return false; }
+  // Мотив-заставка (см. include/sound.h), играет один раз при старте
+  // игры и на экране правил. nullptr — без заставки.
+  virtual const MusicTrack* music() const { return nullptr; }
+  // Набор звуков игры: переопределяет стандартные эффекты (выстрел,
+  // попадание, взрыв...), чтобы каждая игра звучала по-своему.
+  virtual const SfxBank* sounds() const { return nullptr; }
 
   virtual void reset() = 0;
   virtual void update(const Inputs& in, Ctx& c) = 0;

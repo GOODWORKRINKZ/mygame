@@ -1,5 +1,6 @@
 #pragma once
 #include "game.h"
+#include "sound.h"
 
 // ============================================================
 //  1) TUG OF WAR — перетягивание каната (2 игрока)
@@ -12,6 +13,7 @@ public:
   const char* name() const override { return "КАНАТ"; }
   const char* hint() const override { return "ДОЛБИ! ВЫШИБИ ИЗ ЗОНЫ"; }
   Color theme() const override { return rgb(255, 120, 0); }
+  const MusicTrack* music() const override { return &MUSIC_TUG; }
   RuleText rules() const override {
     static const char* L[] = {
       "2 ИГРОКА",
@@ -57,6 +59,8 @@ public:
   const char* name() const override { return "СТРЕЛОК"; }
   const char* hint() const override { return "ТАП=ОГОНЬ УДЕРЖ=ЗАРЯД"; }
   Color theme() const override { return rgb(255, 40, 40); }
+  const MusicTrack* music() const override { return &MUSIC_SHOOTER; }
+  const SfxBank* sounds() const override { return &SND_SHOOTER; }
   RuleText rules() const override {
     static const char* L[] = {
       "2 ИГРОКА",
@@ -108,6 +112,8 @@ public:
   const char* name() const override { return "ПОНГ"; }
   const char* hint() const override { return "ДЕРЖИ ЗАРЯД, ОТПУСТИ"; }
   Color theme() const override { return rgb(0, 220, 220); }
+  const MusicTrack* music() const override { return &MUSIC_PONG; }
+  const SfxBank* sounds() const override { return &SND_PONG; }
   RuleText rules() const override {
     static const char* L[] = {
       "2 ИГРОКА",
@@ -138,6 +144,58 @@ private:
 };
 
 // ============================================================
+//  3b) PONG 2D — понг на матрице 4x4 (2 игрока, полный холст)
+//      Мяч летает по диагоналям внутри квадрата, ракетки в крайних
+//      колонках закрывают пол-высоты, кнопка переключает верх/низ.
+// ============================================================
+class Pong2dGame : public Game {
+public:
+  const char* name() const override { return "ПОНГ 2D"; }
+  const char* hint() const override { return "КНОПКА = ВЕРХ/НИЗ"; }
+  Color theme() const override { return rgb(0, 255, 200); }
+  const MusicTrack* music() const override { return &MUSIC_PONG2D; }
+  const SfxBank* sounds() const override { return &SND_PONG2D; }
+  bool  fullCanvas() const override { return true; }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "2 ИГРОКА",
+      "МЯЧ ХОДИТ ПО КЛЕТКАМ",
+      "ПО ДИАГОНАЛИ",
+      "БЕЛАЯ ТОЧКА = КУДА",
+      "ОН ПРИЛЕТИТ",
+      "РАКЕТКА = 2 ТОЧКИ",
+      "КНОПКА = ВВЕРХ/ВНИЗ",
+      "ОТБИЛ - МЯЧ БЫСТРЕЕ",
+      "ПРОПУСК = ОЧКО ВРАГУ",
+      "МАТЧ ДО 3 ПОБЕД",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
+  void reset() override;
+  void update(const Inputs& in, Ctx& c) override;
+
+private:
+  Match    m;
+  int      x = 1, y = 1;           // клетка мяча в матрице 0..3
+  int      dx = 1, dy = 1;         // направление, всегда диагональ
+  int      px = 1, py = 1;         // прошлая клетка — след
+  uint16_t stepMs = PONG2D_STEP_START;
+  uint32_t nextStep = 0;
+  bool     padTop[2] = {true, true};
+  int      rally = 0;
+  uint32_t serveAt = 0;
+  uint32_t goalUntil = 0;
+
+  void newRally(uint32_t now);
+  bool covers(int p, int row) const;
+  int  impactRow(int* side) const;
+  void bounce(int p, Ctx& c);
+  void goal(int scorer, Ctx& c);
+  void render(Ctx& c);
+  void oled(Ctx& c);
+};
+
+// ============================================================
 //  4) DUEL — дуэль на реакцию (2 игрока)
 //     Лента наливается красным, потом внезапно вспыхивает белым.
 //     Кто первый нажал — забрал раунд. Нажал раньше сигнала —
@@ -148,6 +206,8 @@ public:
   const char* name() const override { return "ДУЭЛЬ"; }
   const char* hint() const override { return "ЖДИ ВСПЫШКУ!"; }
   Color theme() const override { return rgb(255, 255, 255); }
+  const MusicTrack* music() const override { return &MUSIC_DUEL; }
+  const SfxBank* sounds() const override { return &SND_DUEL; }
   RuleText rules() const override {
     static const char* L[] = {
       "2 ИГРОКА",
@@ -185,6 +245,7 @@ public:
   const char* name() const override { return "СПРИНТ"; }
   const char* hint() const override { return "БЕГИ ДО КРАЯ"; }
   Color theme() const override { return rgb(255, 220, 0); }
+  const MusicTrack* music() const override { return &MUSIC_SPRINT; }
   RuleText rules() const override {
     static const char* L[] = {
       "2 ИГРОКА",
@@ -221,6 +282,8 @@ public:
   const char* name() const override { return "БОМБА"; }
   const char* hint() const override { return "ОТБЕЙ В СВОЕЙ ЗОНЕ"; }
   Color theme() const override { return rgb(255, 60, 0); }
+  const MusicTrack* music() const override { return &MUSIC_BOMB; }
+  const SfxBank* sounds() const override { return &SND_BOMB; }
   RuleText rules() const override {
     static const char* L[] = {
       "2 ИГРОКА",
@@ -260,6 +323,8 @@ public:
   const char* name() const override { return "ОРБИТА"; }
   const char* hint() const override { return "ОТБЕЙ У СВОЕЙ КНОПКИ"; }
   Color theme() const override { return rgb(255, 170, 0); }
+  const MusicTrack* music() const override { return &MUSIC_ORBIT; }
+  const SfxBank* sounds() const override { return &SND_ORBIT; }
   bool  fullCanvas() const override { return true; }
   RuleText rules() const override {
     static const char* L[] = {
@@ -311,6 +376,8 @@ public:
   const char* hint() const override { return "ЗЕЛЕНАЯ: СТОП В ЗОНЕ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(255, 0, 120); }
+  const MusicTrack* music() const override { return &MUSIC_SNIPER; }
+  const SfxBank* sounds() const override { return &SND_SNIPER; }
   RuleText rules() const override {
     static const char* L[] = {
       "1 ИГРОК",
@@ -344,6 +411,122 @@ private:
   void placeZone();
   void render(Ctx& c);
   void oled(Ctx& c);
+};
+
+// ============================================================
+//  7b) CATCH — лови (1 игрок, матрица 4x4, полный холст)
+//      Блоки падают по колонкам, корзина внизу ловит. Зелёная —
+//      вправо, синяя — влево. Рукава: жизни и очки.
+// ============================================================
+class CatchGame : public Game {
+public:
+  const char* name() const override { return "ЛОВИ"; }
+  const char* hint() const override { return "ЗЕЛ=ВПРАВО СИН=ВЛЕВО"; }
+  uint8_t players() const override { return 1; }
+  Color theme() const override { return rgb(255, 200, 0); }
+  const MusicTrack* music() const override { return &MUSIC_CATCH; }
+  const SfxBank* sounds() const override { return &SND_CATCH; }
+  bool  fullCanvas() const override { return true; }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "1 ИГРОК",
+      "БЛОКИ ПАДАЮТ СВЕРХУ",
+      "КОРЗИНА ВНИЗУ",
+      "ЗЕЛЕНАЯ = ВПРАВО",
+      "СИНЯЯ = ВЛЕВО",
+      "ПОЙМАЛ = ОЧКО",
+      "УПУСТИЛ = -ЖИЗНЬ",
+      "3 ЖИЗНИ",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
+  void reset() override;
+  void update(const Inputs& in, Ctx& c) override;
+
+private:
+  struct Drop { float y = 0; uint8_t col = 0; bool active = false; };
+  static const int MAX_DROPS = 3;
+
+  Drop     drops[MAX_DROPS];
+  int      basket = 1;             // левая клетка корзины, 0..2
+  float    speed = CATCH_SPEED_START;
+  float    spawnIn = 1.0f;
+  int      lives = CATCH_LIVES;
+  int      score = 0;
+  int      best = 0;
+  int      lastCol = -1;
+  bool     newRecord = false;
+  bool     over = false;
+  uint32_t overUntil = 0;
+  uint32_t flashUntil = 0;
+  bool     flashGood = false;
+
+  void spawn();
+  void render(Ctx& c);
+  void oled(Ctx& c);
+};
+
+// ============================================================
+//  7c) COLORS — цвета (1 игрок, матрица 4x4, полный холст)
+//      Цветные блоки падают, три в ряд исчезают, цепочки умножают.
+// ============================================================
+class ColorsGame : public Game {
+public:
+  const char* name() const override { return "ЦВЕТА"; }
+  const char* hint() const override { return "СОБЕРИ 3 ОДНОГО ЦВЕТА"; }
+  uint8_t players() const override { return 1; }
+  Color theme() const override { return rgb(255, 0, 200); }
+  const MusicTrack* music() const override { return &MUSIC_COLORS; }
+  const SfxBank* sounds() const override { return &SND_COLORS; }
+  bool  fullCanvas() const override { return true; }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "1 ИГРОК",
+      "СВЕРХУ ПАДАЕТ БЛОК",
+      "ЗЕЛЕНАЯ = ВПРАВО",
+      "СИНЯЯ = ВЛЕВО",
+      "3 ОДНОГО ЦВЕТА В РЯД",
+      "ИЛИ СТОЛБИК ИСЧЕЗАЮТ",
+      "ВЕРХНИЕ ПРОСЕДАЮТ",
+      "ЦЕПОЧКА = МНОЖИТЕЛЬ",
+      "НЕКУДА ПАДАТЬ = КОНЕЦ",
+      "СИНИЙ РУКАВ = СЛЕД.",
+      "ЦВЕТ",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
+  void reset() override;
+  void update(const Inputs& in, Ctx& c) override;
+
+private:
+  enum class Ph : uint8_t { Fall, Clear };
+  uint8_t  grid[MATRIX_SIZE][MATRIX_SIZE];   // [ряд][столбец], 0 = пусто
+  int      fcol = 0;               // колонка падающего блока
+  float    fy = 0;                 // его высота (ряд, дробный)
+  uint8_t  fkind = 1;              // его цвет
+  uint8_t  next = 1;               // следующий цвет
+  Ph       ph = Ph::Fall;
+  uint16_t marks = 0;              // битовая маска исчезающих клеток
+  uint32_t clearUntil = 0;
+  int      chain = 0;
+  int      score = 0;
+  int      lastScore = 0;
+  uint32_t lastScoreUntil = 0;
+  int      best = 0;
+  bool     newRecord = false;
+  bool     over = false;
+  uint32_t overUntil = 0;
+
+  int   palette() const;
+  float speed() const;
+  int   restRow(int col) const;
+  bool  spawn();
+  int   findMatches();
+  void  collapse();
+  void  land(Ctx& c);
+  void  resolve(Ctx& c);
+  void  render(Ctx& c);
+  void  oled(Ctx& c);
 };
 
 // ============================================================
@@ -411,6 +594,8 @@ public:
   const char* hint() const override { return "КР=ПРЫЖОК СИН=ПОДКАТ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(0, 255, 160); }
+  const MusicTrack* music() const override { return &MUSIC_RUNNER; }
+  const SfxBank* sounds() const override { return &SND_RUNNER; }
   RuleText rules() const override {
     static const char* L[] = {
       "1 ИГРОК",
@@ -470,6 +655,8 @@ public:
   const char* hint() const override { return "З=ВЫСТРЕЛ С=ВЗРЫВ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(0, 160, 255); }
+  const MusicTrack* music() const override { return &MUSIC_DEFENDER; }
+  const SfxBank* sounds() const override { return &SND_DEFENDER; }
   RuleText rules() const override {
     static const char* L[] = {
       "1 ИГРОК",
@@ -518,6 +705,8 @@ public:
   const char* name() const override { return "СТОП-СИГНАЛ"; }
   const char* hint() const override { return "ЗЕЛ. ЖМИ, КРАСН. НЕТ"; }
   Color theme() const override { return rgb(0, 255, 40); }
+  const MusicTrack* music() const override { return &MUSIC_TRAFFIC; }
+  const SfxBank* sounds() const override { return &SND_DUEL; }
   RuleText rules() const override {
     static const char* L[] = {
       "2 ИГРОКА",
@@ -557,6 +746,8 @@ public:
   const char* name() const override { return "БОЙ"; }
   const char* hint() const override { return "ТАП=УДАР ДЕРЖИ=БЛОК"; }
   Color theme() const override { return rgb(255, 80, 140); }
+  const MusicTrack* music() const override { return &MUSIC_FIGHT; }
+  const SfxBank* sounds() const override { return &SND_FIGHT; }
   RuleText rules() const override {
     static const char* L[] = {
       "2 ИГРОКА",
@@ -610,6 +801,8 @@ public:
   const char* name() const override { return "ЖАДНОСТЬ"; }
   const char* hint() const override { return "ДЕРЖИ И ВОВРЕМЯ БРОСЬ"; }
   Color theme() const override { return rgb(255, 190, 0); }
+  const MusicTrack* music() const override { return &MUSIC_GREED; }
+  const SfxBank* sounds() const override { return &SND_GREED; }
   RuleText rules() const override {
     static const char* L[] = {
       "2 ИГРОКА",
@@ -645,22 +838,27 @@ private:
 };
 
 // ============================================================
-//  14) CHASE — догонялки по кольцу (2 игрока)
-//      Лента считается замкнутой. Один убегает, другой догоняет,
-//      оба долбят кнопку. Роли меняются каждый раунд.
+//  14) CHASE — догонялки по кольцу матрицы (2 игрока, полный холст)
+//      Трасса — периметр матрицы (RING). Один убегает, другой догоняет,
+//      оба долбят кнопку. Рукава показывают скорость, сердцевина —
+//      остаток времени. Роли меняются каждый раунд.
 // ============================================================
 class ChaseGame : public Game {
 public:
   const char* name() const override { return "ДОГОНЯЛКИ"; }
-  const char* hint() const override { return "ЛЕНТА = КОЛЬЦО"; }
+  const char* hint() const override { return "ГОНКА ПО КОЛЬЦУ"; }
   Color theme() const override { return rgb(255, 0, 200); }
+  const MusicTrack* music() const override { return &MUSIC_CHASE; }
+  bool  fullCanvas() const override { return true; }
   RuleText rules() const override {
     static const char* L[] = {
       "2 ИГРОКА",
-      "ЛЕНТА = КОЛЬЦО",
+      "ТРАССА = КОЛЬЦО",
+      "В ЦЕНТРЕ",
       "ЖМИ ЧТОБЫ БЕЖАТЬ",
+      "РУКАВ = ТВОЯ СКОРОСТЬ",
       "ОХОТНИК ЧУТЬ БЫСТРЕЕ",
-      "ДОГНАЛ ВОВРЕМЯ -",
+      "ДОГНАЛ ЗА 14 СЕК -",
       "ОЧКО ОХОТНИКУ",
       "УБЕЖАЛ - ОЧКО БЕГЛЕЦУ",
       "РОЛИ МЕНЯЮТСЯ КАЖДЫЙ",
@@ -696,6 +894,8 @@ public:
   const char* name() const override { return "КЛАД"; }
   const char* hint() const override { return "ХОДИМ ПО ОЧЕРЕДИ"; }
   Color theme() const override { return rgb(255, 120, 0); }
+  const MusicTrack* music() const override { return &MUSIC_HUNT; }
+  const SfxBank* sounds() const override { return &SND_HUNT; }
   RuleText rules() const override {
     static const char* L[] = {
       "2 ИГРОКА",
@@ -746,6 +946,8 @@ public:
   const char* hint() const override { return "СТОП НАД ПЛОЩАДКОЙ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(0, 200, 255); }
+  const MusicTrack* music() const override { return &MUSIC_TOWER; }
+  const SfxBank* sounds() const override { return &SND_TOWER; }
   RuleText rules() const override {
     static const char* L[] = {
       "1 ИГРОК",
@@ -793,6 +995,8 @@ public:
   const char* hint() const override { return "ЗЕЛ=РАЗВОРОТ СИН=ГАЗ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(60, 255, 0); }
+  const MusicTrack* music() const override { return &MUSIC_SNAKE; }
+  const SfxBank* sounds() const override { return &SND_SNAKE; }
   RuleText rules() const override {
     static const char* L[] = {
       "1 ИГРОК",
@@ -850,6 +1054,8 @@ public:
   const char* hint() const override { return "ЖМИ В ДОЛЮ"; }
   uint8_t players() const override { return 1; }
   Color theme() const override { return rgb(255, 0, 90); }
+  const MusicTrack* music() const override { return &MUSIC_RHYTHM; }
+  const SfxBank* sounds() const override { return &SND_RHYTHM; }
   RuleText rules() const override {
     static const char* L[] = {
       "1 ИГРОК",
@@ -943,25 +1149,33 @@ private:
 };
 
 // ============================================================
-//  20) SIEGE — осада (кооператив)
-//      База в центре ленты, враги лезут с обоих краёв. Зелёный
-//      держит левый фланг, синий — правый. Жизни и счёт общие.
+//  20) SIEGE — осада (кооператив, полный холст)
+//      База — сердцевина матрицы, враги ползут по рукавам к воротам.
+//      Дошедший до ворот враг кружит по кольцу и бьёт базу через круг,
+//      если его не сняли в упор у чьих-нибудь ворот. Жизни и счёт общие.
 // ============================================================
 class SiegeGame : public Game {
 public:
   const char* name() const override { return "ОСАДА"; }
-  const char* hint() const override { return "ДЕРЖИ СВОЙ ФЛАНГ"; }
+  const char* hint() const override { return "ДЕРЖИ СВОЙ РУКАВ"; }
   bool coop() const override { return true; }
   Color theme() const override { return rgb(255, 60, 0); }
+  const MusicTrack* music() const override { return &MUSIC_SIEGE; }
+  const SfxBank* sounds() const override { return &SND_SIEGE; }
+  bool  fullCanvas() const override { return true; }
   RuleText rules() const override {
     static const char* L[] = {
       "КООПЕРАТИВ НА ДВОИХ",
-      "БАЗА В ЦЕНТРЕ ЛЕНТЫ",
-      "ВРАГИ ЛЕЗУТ С КРАЕВ",
-      "ЗЕЛЕНАЯ БЬЕТ ВЛЕВО",
-      "СИНЯЯ БЬЕТ ВПРАВО",
+      "БАЗА = ЦЕНТР МАТРИЦЫ",
+      "ВРАГИ ИДУТ ПО РУКАВАМ",
+      "ОТ КНОПОК К ЦЕНТРУ",
+      "ЖМИ = ВЫСТРЕЛ ПО",
+      "СВОЕМУ РУКАВУ",
+      "ПРОРВАЛСЯ - КРУЖИТ",
+      "ПО КОЛЬЦУ, БЬЕТ БАЗУ",
+      "ЧЕРЕЗ КРУГ. СНИМИ ЕГО",
+      "У СВОИХ ВОРОТ В УПОР",
       "ЖИЗНИ И СЧЕТ ОБЩИЕ",
-      "ВОЛНЫ СТАНОВЯТСЯ ЗЛЕЕ",
     };
     return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
   }
@@ -970,15 +1184,19 @@ public:
 
 private:
   struct Foe {
-    float    pos = 0;
+    float    pos = 0;       // по рукаву: индекс пути, 0 у кнопки, растёт к воротам
     float    vel = 0;
     int8_t   hp = 0;
     uint8_t  kind = 0;      // 0 обычный, 1 бронированный, 2 босс
-    int8_t   side = -1;     // -1 слева, +1 справа
+    int8_t   side = -1;     // -1 рукав зелёного (ARM_P1), +1 рукав синего (ARM_P2)
+    bool     onRing = false;
+    float    ringPos = 0;   // позиция на кольце
+    float    travel = 0;    // сколько прошёл по кольцу (круг = удар по базе)
+    int8_t   dir = 1;       // направление по кольцу
     bool     active = false;
     uint32_t flashUntil = 0;
   };
-  struct Slug { float pos = 0; int8_t dir = 0; bool active = false; };
+  struct Slug { float pos = 0; int8_t side = 0; bool active = false; };
 
   Foe      foes[SIEGE_MAX_ENEMY];
   Slug     shots[SIEGE_MAX_BULLETS];
@@ -996,6 +1214,7 @@ private:
 
   void spawnFoe();
   void shoot(int p, Ctx& c);
+  void killFoe(Foe& f, Ctx& c);
   void render(Ctx& c);
   void oled(Ctx& c);
 };
@@ -1005,7 +1224,7 @@ private:
 // ============================================================
 class GameManager {
 public:
-  static const int COUNT = 21;
+  static const int COUNT = 24;
 
   GameManager();
 
@@ -1026,11 +1245,14 @@ private:
   TugGame      _tug;
   ShooterGame  _shooter;
   PongGame     _pong;
+  Pong2dGame   _pong2d;
   DuelGame     _duel;
   SprintGame   _sprint;
   BombGame     _bomb;
   OrbitGame    _orbit;
   SniperGame   _sniper;
+  CatchGame    _catch;
+  ColorsGame   _colors;
   SimonGame    _simon;
   RunnerGame   _runner;
   DefenderGame _defender;

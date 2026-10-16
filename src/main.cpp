@@ -6,6 +6,7 @@
 #include "ui.h"
 #include "game.h"
 #include "games.h"
+#include "sound.h"
 #include "log.h"
 
 // ============================================================
@@ -156,6 +157,7 @@ static void playBootAnimation() {
 // ============================================================
 static void runDiagnostics() {
   LOG_I("DIAG", "strip diagnostics start");
+  out.musicStop();
   char l1[26], l2[26];
   snprintf(l1, sizeof l1, "ФИЗ %d  ИГРА %d", LED_PHYSICAL_COUNT, LED_COUNT);
   snprintf(l2, sizeof l2, "СТЕНЫ %d", LED_PHYSICAL_COUNT - LED_COUNT);
@@ -208,15 +210,26 @@ static void runButtonTest() {
 
   Button* btn[3] = { &btnP1, &btnP2, &btnMenu };
   const char* nm[3] = { "ЗЕЛ", "СИН", "МЕНЮ" };
+  for (int i = 0; i < 3; i++) btn[i]->resetStats();
   uint32_t cnt[3] = {0, 0, 0}, lastDur[3] = {0, 0, 0};
+  uint32_t relAt[3] = {0, 0, 0};              // когда отпустили в последний раз
+  uint32_t minDown = 9999, minUp = 9999;      // самое короткое нажатие / пауза (P1+P2)
   uint32_t lastDraw = 0;
 
   for (;;) {
+    uint32_t t = millis();
     for (int i = 0; i < 3; i++) {
       btn[i]->update();
-      if (btn[i]->pressed())  { cnt[i]++; LOG_D("BTN", "%s down", nm[i]); }
+      if (btn[i]->pressed()) {
+        cnt[i]++;
+        // пауза между отпусканием и новым нажатием — это предел скорости долбежа
+        if (i < 2 && relAt[i] && t - relAt[i] < minUp) minUp = t - relAt[i];
+        LOG_D("BTN", "%s down (gap %lu ms)", nm[i], relAt[i] ? (unsigned long)(t - relAt[i]) : 0UL);
+      }
       if (btn[i]->released()) {
         lastDur[i] = btn[i]->lastHeldMs();
+        relAt[i] = t;
+        if (i < 2 && lastDur[i] < minDown) minDown = lastDur[i];
         LOG_D("BTN", "%s up after %lu ms", nm[i], (unsigned long)lastDur[i]);
       }
     }
@@ -249,7 +262,13 @@ static void runButtonTest() {
                  raw[i] ? "НАЖ" : "---", (unsigned long)cnt[i], (unsigned long)lastDur[i]);
         dpy.text(2, 18 + i * 9, line, 1);
       }
-      dpy.textCentered(45, mismatch ? "ДРЕБЕЗГ/РАССИНХРОН" : "НАЖ = НОГА НА GND", 1);
+      char mm[26];
+      uint32_t gl = btnP1.holdGlitches() + btnP2.holdGlitches();
+      if (minDown == 9999) snprintf(mm, sizeof mm, "НАЖ = НОГА НА GND");
+      else snprintf(mm, sizeof mm, "МИН %lu/%luМС РАЗРЫВ %lu",
+                    (unsigned long)minDown, (unsigned long)(minUp == 9999 ? 0 : minUp),
+                    (unsigned long)gl);
+      dpy.textCentered(45, mismatch ? "ДРЕБЕЗГ/РАССИНХРОН" : mm, 1);
       dpy.textCentered(57, "УДЕРЖИ МЕНЮ = ВЫХОД", 1);
       dpy.flush();
     }
@@ -271,6 +290,8 @@ static void enterMenu() {
   state = AppState::Menu;
   fx.reset();
   out.silence();
+  out.setBank(nullptr);
+  out.music(&MUSIC_MENU);
   leds.setFullCanvas(false);
   lastInput = millis();
   LOG_I("APP", "menu, cursor on %s", manager.now()->name());
@@ -281,6 +302,9 @@ static void enterHelp() {
   helpPage = 0;
   fx.reset();
   out.silence();
+  // на экране правил звучит заставка выбранной игры — так её можно "послушать"
+  out.setBank(manager.now()->sounds());
+  out.music(manager.now()->music());
   leds.setFullCanvas(false);
   lastInput = millis();
   LOG_I("APP", "help for %s", manager.now()->name());
@@ -291,6 +315,8 @@ static void enterPlay() {
   fx.reset();
   leds.resetWall();          // меню подкрашивает стены — возвращаем как было
   leds.setFullCanvas(manager.now()->fullCanvas());
+  out.setBank(manager.now()->sounds());
+  out.music(manager.now()->music());
   manager.resetCurrent();
   LOG_I("APP", "start %s (%dP)", manager.now()->name(), manager.now()->players());
 }
@@ -412,7 +438,7 @@ void loop() {
       if (btnP1.repeat(in.p1.pressed)) { manager.next(); out.sfx(Sfx::Click); }
       if (btnP2.repeat(in.p2.pressed)) { manager.prev(); out.sfx(Sfx::Click); }
       if (menuShort) { out.sfx(Sfx::Select); enterHelp(); break; }
-      if (menuLong)  { runDiagnostics(); lastFrame = millis(); }
+      if (menuLong)  { runDiagnostics(); lastFrame = millis(); out.music(&MUSIC_MENU); }
       updateMenu(in, c);
       break;
 
@@ -425,7 +451,8 @@ void loop() {
 
     case AppState::Play:
       if (menuShort) { out.sfx(Sfx::Back); enterMenu(); break; }
-      if (menuLong)  { out.sfx(Sfx::Select); manager.resetCurrent(); fx.reset(); }
+      if (menuLong)  { out.sfx(Sfx::Select); manager.resetCurrent(); fx.reset();
+                       out.music(manager.now()->music()); }
       manager.now()->update(in, c);
       break;
 
