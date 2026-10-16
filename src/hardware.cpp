@@ -1,6 +1,7 @@
 #include "hardware.h"
 #include "font_ru.h"
 #include <math.h>
+#include "driver/gpio.h"
 
 // ============================================================
 //  Утилиты цвета
@@ -750,20 +751,76 @@ void Output::sfx(Sfx id) {
 //  Button
 // ============================================================
 
+// ---- очередь событий: пишет ISR, читает loop ----
+struct BtnEvent {
+  uint32_t ms;      // millis() в момент прерывания
+  uint8_t  pin;
+  uint8_t  low;     // 1 = нога на GND (нажата)
+};
+static const uint8_t EVQ = 64;                       // степень двойки
+static volatile BtnEvent  s_q[EVQ];
+static volatile uint8_t   s_head = 0, s_tail = 0;    // один писатель (ISR), один читатель
+static volatile uint32_t  s_dropped = 0;
+
+Button* Button::s_all[Button::MAX_BUTTONS] = { nullptr, nullptr, nullptr, nullptr };
+uint8_t Button::s_count = 0;
+
+uint32_t Button::droppedEvents() { return s_dropped; }
+
+void IRAM_ATTR Button::isr(void* arg) {
+  Button* b = (Button*)arg;
+  uint8_t h = s_head;
+  uint8_t n = (uint8_t)((h + 1) & (EVQ - 1));
+  if (n == s_tail) { s_dropped++; return; }          // переполнение — событие пропадёт,
+                                                     // settle() достроит фронт по ноге
+  s_q[h].ms  = millis();
+  s_q[h].pin = b->_pin;
+  s_q[h].low = (gpio_get_level((gpio_num_t)b->_pin) == 0) ? 1 : 0;
+  s_head = n;
+}
+
 void Button::begin(uint8_t pin) {
   _pin = pin;
   pinMode(_pin, INPUT_PULLUP);
+  _lastDebounceRaw = (digitalRead(_pin) == LOW);
+  _lastDebounceTime = millis();
+  if (s_count < MAX_BUTTONS) s_all[s_count++] = this;
+  else LOG_E("BTN", "too many buttons, pin %u polled without IRQ", _pin);
+  attachInterruptArg(digitalPinToInterrupt(_pin), &Button::isr, this, CHANGE);
+}
+
+// Раздать все накопившиеся события их кнопкам, в хронологическом порядке.
+void Button::drain() {
+  while (s_tail != s_head) {
+    uint8_t t = s_tail;
+    uint32_t ms = s_q[t].ms;
+    uint8_t pin = s_q[t].pin;
+    bool low = s_q[t].low != 0;
+    s_tail = (uint8_t)((t + 1) & (EVQ - 1));
+    for (uint8_t i = 0; i < s_count; i++)
+      if (s_all[i] && s_all[i]->_pin == pin) { s_all[i]->feed(low, ms); break; }
+  }
+}
+
+// Фронт на ноге в момент ms (из прерывания или достроенный сверкой).
+void Button::feed(bool low, uint32_t ms) {
+  if (low == _lastDebounceRaw) return;             // уровень тот же — пульс был короче ISR
+  if (_raw && !low) _glitches++;                   // контакт разомкнулся во время удержания
+  _lastDebounceRaw = low;
+  _lastDebounceTime = ms;
 }
 
 void Button::update() {
-  bool nowRaw = digitalRead(_pin) == LOW;   // активный низкий уровень
+  drain();
   uint32_t now = millis();
+  // Сверка с ногой: если событие потерялось, достраиваем фронт "сейчас".
+  bool cur = digitalRead(_pin) == LOW;
+  if (cur != _lastDebounceRaw) feed(cur, now);
+  settle(now);
+}
 
-  if (nowRaw != _lastDebounceRaw) {
-    _lastDebounceTime = now;
-    _lastDebounceRaw = nowRaw;
-    if (_raw && !nowRaw) _glitches++;        // контакт разомкнулся во время удержания
-  }
+void Button::settle(uint32_t now) {
+  bool nowRaw = _lastDebounceRaw;
   // Нажатие подтверждаем быстро. Отпускание — дольше, и тем дольше, чем
   // дольше держали: короткий тап при долбеже отпускается за BTN_RELEASE_MS,
   // а долгое удержание (заряд, блок, полоска в ЖАДНОСТИ) не рвётся от
@@ -779,13 +836,13 @@ void Button::update() {
   _released = !stable && _raw;
 
   if (_pressed) {
-    _pressStart = now;
+    _pressStart = _lastDebounceTime;               // время самого фронта, не кадра
     _longFired = false;
     _longFlag = false;
     _stuckWarned = false;
     _nextRepeat = 0;
   }
-  if (_released) _lastHeld = now - _pressStart;
+  if (_released) _lastHeld = _lastDebounceTime - _pressStart;
 
   _raw = stable;
 
