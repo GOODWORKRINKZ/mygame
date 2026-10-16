@@ -174,7 +174,7 @@
 #define DOOM_TAP_MS         200    // короче — тап (поворот), дольше — удержание (ход)
 #define DOOM_AIM_HALF       0.39f  // полуширина створа попадания, рад (~22 градуса)
 #define DOOM_FIRE_MS        380    // пауза между выстрелами при зажатых обеих
-#define DOOM_FOE_HP         2
+#define DOOM_FOE_HP         1
 #define DOOM_FOE_SPEED      0.7f   // клеток в секунду (+0.06 за волну)
 #define DOOM_BITE_MS        900
 #define DOOM_BITE_DMG       10
