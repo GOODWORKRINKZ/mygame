@@ -196,6 +196,60 @@ private:
 };
 
 // ============================================================
+//  3c) RACE — гонка на двоих (матрица 4x4 + 3D сплит-экран)
+// ============================================================
+class RaceGame : public Game {
+public:
+  const char* name() const override { return "ГОНКА"; }
+  const char* hint() const override { return "КНОПКА = СМЕНА ПОЛОСЫ"; }
+  Color theme() const override { return rgb(255, 220, 40); }
+  const MusicTrack* music() const override { return &MUSIC_RACE; }
+  const SfxBank* sounds() const override { return &SND_RACE; }
+  bool  fullCanvas() const override { return true; }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "2 ИГРОКА",
+      "ШОССЕ В 4 ПОЛОСЫ",
+      "СИНИЙ - ЛЕВАЯ ПАРА",
+      "ЗЕЛЕНЫЙ - ПРАВАЯ",
+      "КНОПКА = СМЕНА ПОЛОСЫ",
+      "ВСТРЕЧНЫЕ ЕДУТ СВЕРХУ",
+      "ЗАДЕЛ = -ЖИЗНЬ (ИЗ 3)",
+      "НА ЭКРАНЕ - СВОЯ",
+      "ДОРОГА У КАЖДОГО",
+      "МАТЧ ДО 3 ПОБЕД",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
+  void reset() override;
+  void update(const Inputs& in, Ctx& c) override;
+
+private:
+  struct Car { float y = 0; uint8_t col = 0; bool active = false; bool judged = false; };
+  static const int MAX_CARS = 8;
+
+  Match    m;
+  Car      traffic[MAX_CARS];
+  int      laneIdx[2] = {0, 1};    // 0/1 внутри своей пары
+  float    laneX[2] = {2, 1};
+  int      lives[2] = {RACE_LIVES, RACE_LIVES};
+  int      dodged[2] = {0, 0};
+  uint32_t hurtUntil[2] = {0, 0};
+  float    speed = RACE_SPEED_START;
+  float    spawnIn = 1.5f;
+  float    dist = 0;
+  int      rows = 0;
+  uint32_t startAt = 0;
+
+  void newRound(uint32_t now);
+  void spawnRow();
+  void render(Ctx& c);
+  void drawRoad(Adafruit_SSD1306& g, int rot, int me, uint32_t now);
+  void oled(Ctx& c);
+  void oledMatch(Ctx& c);
+};
+
+// ============================================================
 //  4) DUEL — дуэль на реакцию (2 игрока)
 //     Лента наливается красным, потом внезапно вспыхивает белым.
 //     Кто первый нажал — забрал раунд. Нажал раньше сигнала —
@@ -583,6 +637,184 @@ private:
   void spawnRow();
   void render(Ctx& c);
   void oled(Ctx& c);
+};
+
+// ============================================================
+//  7e) MAZE — лабиринт от первого лица (1 игрок, рейкастинг на OLED)
+// ============================================================
+class MazeGame : public Game {
+public:
+  const char* name() const override { return "ЛАБИРИНТ"; }
+  const char* hint() const override { return "ТАП=ПОВОРОТ ДЕРЖИ=ШАГ"; }
+  uint8_t players() const override { return 1; }
+  Color theme() const override { return rgb(0, 200, 255); }
+  const MusicTrack* music() const override { return &MUSIC_MAZE; }
+  const SfxBank* sounds() const override { return &SND_MAZE; }
+  bool  fullCanvas() const override { return true; }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "1 ИГРОК",
+      "НА ЭКРАНЕ - ВИД ИЗ",
+      "ГЛАЗ, НА ЛЕНТЕ КАРТА",
+      "ТАП ЗЕЛЕНОЙ = ВПРАВО",
+      "ТАП СИНЕЙ = ВЛЕВО",
+      "ДЕРЖИ ЛЮБУЮ = ШАГ",
+      "СОБЕРИ 5 КРИСТАЛЛОВ",
+      "ЗА 90 СЕКУНД",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
+  void reset() override;
+  void update(const Inputs& in, Ctx& c) override;
+
+private:
+  uint8_t  wall[MAZE_CELLS * 2 + 1][MAZE_CELLS * 2 + 1];
+  int      cellX = 1, cellY = 1;   // клетка игрока в блоках (нечётные координаты)
+  int      dir = 0;                // 0 +x, 1 +y, 2 -x, 3 -y
+  float    px = 1.5f, py = 1.5f;   // позиция для рейкастинга
+  float    ang = 0, angFrom = 0, angTo = 0;
+  float    moveFrom[2] = {0, 0}, moveTo[2] = {0, 0};
+  uint32_t animStart = 0, animUntil = 0;
+  bool     moving = false, turning = false;
+  uint8_t  crX[MAZE_CRYSTALS], crY[MAZE_CRYSTALS];
+  bool     crGot[MAZE_CRYSTALS];
+  int      got = 0;
+  uint32_t endAt = 0;
+  int      score = 0;
+  int      best = 0;
+  bool     newRecord = false;
+  bool     over = false, won = false;
+  uint32_t overUntil = 0;
+  uint32_t lastOled = 0;
+  int      stepsHeld = 0;
+
+  void generate();
+  bool canStep() const;
+  void render(Ctx& c);
+  void oled(Ctx& c);
+};
+
+// ============================================================
+//  7f) TUNNEL — туннель (1 игрок, вид из кабины на OLED)
+// ============================================================
+class TunnelGame : public Game {
+public:
+  const char* name() const override { return "ТУННЕЛЬ"; }
+  const char* hint() const override { return "ОБЕ КНОПКИ = ВЫСТРЕЛ"; }
+  uint8_t players() const override { return 1; }
+  Color theme() const override { return rgb(80, 160, 255); }
+  const MusicTrack* music() const override { return &MUSIC_TUNNEL; }
+  const SfxBank* sounds() const override { return &SND_TUNNEL; }
+  bool  fullCanvas() const override { return true; }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "1 ИГРОК",
+      "КОРАБЛЬ ЛЕТИТ",
+      "ПО ТУННЕЛЮ",
+      "ЗЕЛЕНАЯ = ВПРАВО",
+      "СИНЯЯ = ВЛЕВО",
+      "ОБЕ ВМЕСТЕ = ВЫСТРЕЛ",
+      "РАЗБИЛ КАМЕНЬ = +3",
+      "ОБОШЕЛ = 1 ОЧКО",
+      "3 ЖИЗНИ",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
+  void reset() override;
+  void update(const Inputs& in, Ctx& c) override;
+
+private:
+  struct Rock { float y = 0; uint8_t col = 0; bool big = false; bool active = false; bool judged = false; };
+  struct Shot { float y = 0; uint8_t col = 0; bool active = false; };
+  static const int MAX_OBS = 8;
+
+  Rock     obs[MAX_OBS];
+  Shot     shot;
+  int      lane = 1;
+  float    laneX = 1.0f;
+  float    speed = TUNNEL_SPEED_START;
+  float    spawnIn = 1.0f;
+  float    dist = 0;
+  int      lives = TUNNEL_LIVES;
+  int      score = 0;
+  int      best = 0;
+  int      lastLane = -1;
+  int      pendingDir = 0;         // отложенный шаг: ждём вторую кнопку
+  uint32_t pendingAt = 0;
+  bool     newRecord = false;
+  bool     over = false;
+  uint32_t overUntil = 0;
+  uint32_t hurtUntil = 0;
+
+  uint8_t reachableLanes() const;
+  void spawnRow();
+  void fire(Ctx& c);
+  void render(Ctx& c);
+  void oled(Ctx& c);
+};
+
+// ============================================================
+//  7g) DOOM — арена от первого лица (1 игрок)
+// ============================================================
+class DoomGame : public Game {
+public:
+  const char* name() const override { return "ДУМ"; }
+  const char* hint() const override { return "ТАП=ПОВОРОТ ДЕРЖИ=ИДИ"; }
+  uint8_t players() const override { return 1; }
+  Color theme() const override { return rgb(255, 0, 0); }
+  const MusicTrack* music() const override { return &MUSIC_DOOM; }
+  const SfxBank* sounds() const override { return &SND_DOOM; }
+  bool  fullCanvas() const override { return true; }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "1 ИГРОК",
+      "АРЕНА ОТ ПЕРВОГО ЛИЦА",
+      "ТАП ЗЕЛ = ВПРАВО 45",
+      "ТАП СИН = ВЛЕВО",
+      "ДЕРЖИ ОДНУ = ИДИ",
+      "ДЕРЖИ ОБЕ = СТРЕЛЯЙ",
+      "ДЕМОНЫ КУСАЮТСЯ",
+      "1 ВЫСТРЕЛ = 1 ДЕМОН",
+      "ВОЛНЫ ДО СМЕРТИ",
+      "КОЛЬЦО = РАДАР:",
+      "ВЕРХ = ПЕРЕД ТОБОЙ",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
+  void reset() override;
+  void update(const Inputs& in, Ctx& c) override;
+
+private:
+  struct Foe {
+    float x = 0, y = 0, speed = 0;
+    int8_t hp = 0;
+    bool active = false, dying = false, growled = false;
+    uint32_t biteAt = 0, hitUntil = 0, dieUntil = 0;
+  };
+
+  Foe      foes[DOOM_MAX_FOES];
+  float    ringAng[12];            // экранный угол каждой клетки кольца вокруг центра матрицы
+  float    px = 8, py = 8, ang = 0;
+  float    angFrom = 0, angTo = 0;
+  uint32_t turnStart = 0, turnUntil = 0;
+  bool     firedDuring[2] = {false, false};   // во время этого нажатия был выстрел — не поворот
+  int      hp = DOOM_HP;
+  int      wave = 0, kills = 0, alive = 0, toSpawn = 0;
+  float    spawnIn = 0;
+  uint32_t fireCd = 0, muzzleUntil = 0, hurtUntil = 0, waveBannerUntil = 0;
+  int      best = 0;
+  bool     newRecord = false;
+  bool     over = false;
+  uint32_t overUntil = 0;
+  uint32_t lastOled = 0;
+
+  void  nextWave(uint32_t now);
+  void  spawnFoe();
+  void  tryMove(float dx, float dy);
+  float wallDist(float a) const;
+  void  fire(Ctx& c);
+  void  render(Ctx& c);
+  void  oled(Ctx& c);
 };
 
 // ============================================================
@@ -1280,7 +1512,7 @@ private:
 // ============================================================
 class GameManager {
 public:
-  static const int COUNT = 25;
+  static const int COUNT = 29;
 
   GameManager();
 
@@ -1302,6 +1534,7 @@ private:
   ShooterGame  _shooter;
   PongGame     _pong;
   Pong2dGame   _pong2d;
+  RaceGame     _race;
   DuelGame     _duel;
   SprintGame   _sprint;
   BombGame     _bomb;
@@ -1310,6 +1543,9 @@ private:
   CatchGame    _catch;
   ColorsGame   _colors;
   DinoGame     _dino;
+  MazeGame     _maze;
+  TunnelGame   _tunnel;
+  DoomGame     _doom;
   SimonGame    _simon;
   RunnerGame   _runner;
   DefenderGame _defender;

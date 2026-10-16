@@ -142,6 +142,44 @@
 #define DINO_SPEED_MAX      4.5f   // быстрее человек между рядами не успевает
 #define DINO_GAP_MIN_ROWS   1.5f   // минимум клеток между рядами препятствий
 
+// --- RACE (ГОНКА, 2 игрока, матрица 4x4 + 3D сплит-экран) ---
+#define RACE_LIVES          3
+#define RACE_SPEED_START    2.0f
+#define RACE_SPEED_UP       0.03f
+#define RACE_SPEED_MAX      4.5f
+#define RACE_GAP_MIN_ROWS   1.6f
+
+// --- MAZE (ЛАБИРИНТ, 1 игрок, рейкастинг на OLED) ---
+#define MAZE_CELLS          8      // клеток по стороне (сетка блоков 17x17)
+#define MAZE_CRYSTALS       5
+#define MAZE_TIME_MS        90000
+#define MAZE_HOLD_MS        250    // дольше — шаг вперёд, короче — поворот
+
+// --- TUNNEL (ТУННЕЛЬ, 1 игрок, вид из кабины) ---
+#define TUNNEL_LIVES          3
+#define TUNNEL_SPEED_START    2.0f
+#define TUNNEL_SPEED_UP       0.04f
+#define TUNNEL_SPEED_MAX      4.5f
+#define TUNNEL_GAP_MIN_ROWS   1.5f
+#define TUNNEL_SHOT_SPEED     14.0f  // рядов в секунду
+#define TUNNEL_FIRE_WINDOW_MS 80     // обе кнопки в этом окне = выстрел
+
+// --- DOOM (ДУМ, 1 игрок, арена от первого лица) ---
+#define DOOM_MAP            16     // арена 16x16
+#define DOOM_HP             100
+#define DOOM_WAVE_HEAL      25
+#define DOOM_WALK_SPEED     1.8f   // клеток в секунду при удержании кнопки
+#define DOOM_TURN_STEP      0.7854f // поворот за тап: 45 градусов
+#define DOOM_TURN_MS        120    // анимация поворота
+#define DOOM_TAP_MS         200    // короче — тап (поворот), дольше — удержание (ход)
+#define DOOM_AIM_HALF       0.39f  // полуширина створа попадания, рад (~22 градуса)
+#define DOOM_FIRE_MS        380    // пауза между выстрелами при зажатых обеих
+#define DOOM_FOE_HP         1
+#define DOOM_FOE_SPEED      0.7f   // клеток в секунду (+0.06 за волну)
+#define DOOM_BITE_MS        900
+#define DOOM_BITE_DMG       10
+#define DOOM_MAX_FOES       8
+
 // --- PONG 2D (понг на матрице, 2 игрока) ---
 // Мяч ходит шагами по клеткам: на 4x4 плавное движение не читается.
 #define PONG2D_STEP_START   420    // мс на одну клетку при подаче

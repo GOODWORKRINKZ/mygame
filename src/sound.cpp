@@ -184,6 +184,28 @@ static const Note T_DINO[] = {
   {N_C4, E}, {N_C4, E}, {N_E4, E}, {N_G4, E}, {N_A4, E}, {N_G4, E}, {N_D4, Q},
 };
 
+//  ГОНКА — мотор набирает обороты
+static const Note T_RACE[] = {
+  {N_E4, E}, {N_E4, E}, {N_G4, E}, {N_A4, E}, {N_B4, Q}, {N_A4, E}, {N_G4, E},
+  {N_E4, E}, {N_E4, E}, {N_G4, E}, {N_B4, E}, {N_D5, Q}, {N_E5, Q},
+};
+//  ЛАБИРИНТ — гулкая, с паузами
+static const Note T_MAZE[] = {
+  {N_A3, Q}, {REST, E}, {N_E4, Q}, {REST, E}, {N_C4, Q}, {N_D4, E}, {N_E4, DQ}, {REST, Q},
+  {N_F4, Q}, {N_E4, E}, {N_D4, Q}, {N_A3, H},
+};
+//  ТУННЕЛЬ — космический пульс
+static const Note T_TUNNEL[] = {
+  {N_C4, E}, {N_G4, E}, {N_C5, E}, {N_G4, E}, {N_Eb4, E}, {N_Bb4, E}, {N_Eb5, E}, {N_Bb4, E},
+  {N_F4, E}, {N_C5, E}, {N_F5, E}, {N_C5, E}, {N_G4, Q}, {N_C5, Q},
+};
+
+//  ДУМ — тяжёлый рифф в басу
+static const Note T_DOOM[] = {
+  {N_E3, E}, {N_E3, E}, {N_E4, E}, {N_E3, E}, {N_E3, E}, {N_D4, E}, {N_E3, E}, {N_E3, E},
+  {N_C4, E}, {N_E3, E}, {N_E3, E}, {N_Bb3, E}, {N_E3, E}, {N_E3, E}, {N_B3, E}, {N_C4, E},
+};
+
 const MusicTrack MUSIC_MENU     = makeTrack(T_MENU);
 const MusicTrack MUSIC_TUG      = makeTrack(T_TUG);
 const MusicTrack MUSIC_SHOOTER  = makeTrack(T_SHOOTER);
@@ -208,6 +230,10 @@ const MusicTrack MUSIC_CATCH    = makeTrack(T_CATCH);
 const MusicTrack MUSIC_PONG2D   = makeTrack(T_PONG2D);
 const MusicTrack MUSIC_COLORS   = makeTrack(T_COLORS);
 const MusicTrack MUSIC_DINO     = makeTrack(T_DINO);
+const MusicTrack MUSIC_RACE     = makeTrack(T_RACE);
+const MusicTrack MUSIC_MAZE     = makeTrack(T_MAZE);
+const MusicTrack MUSIC_TUNNEL   = makeTrack(T_TUNNEL);
+const MusicTrack MUSIC_DOOM     = makeTrack(T_DOOM);
 
 // ============================================================
 //  Банки эффектов. Чего нет в банке — звучит стандартно.
@@ -382,6 +408,48 @@ static const SfxOverride B_DINO[] = {
   SFX_MEL(Pickup, S_DINO_UH),
 };
 
+// ГОНКА — визг шин на смене полосы, удар жестью
+static const Note S_RACE_LANE[] = { {1800, 15}, {1400, 15} };
+static const Note S_RACE_HIT[]  = { {200, 50}, {150, 60}, {0, 20}, {120, 100} };
+static const SfxOverride B_RACE[] = {
+  SFX_MEL(Click, S_RACE_LANE),
+  SFX_MEL(Error, S_RACE_HIT),
+};
+// ЛАБИРИНТ — шаг, поворот, кристалл, стена
+static const Note S_MAZE_STEP[]  = { {220, 12} };
+static const Note S_MAZE_TURN[]  = { {660, 12} };
+static const Note S_MAZE_GEM[]   = { {1319, 40}, {1760, 40}, {2637, 90} };
+static const Note S_MAZE_WALL[]  = { {150, 40} };
+static const SfxOverride B_MAZE[] = {
+  SFX_MEL(Tick, S_MAZE_STEP),
+  SFX_MEL(Click, S_MAZE_TURN),
+  SFX_MEL(Pickup, S_MAZE_GEM),
+  SFX_MEL(Bounce, S_MAZE_WALL),
+};
+// ТУННЕЛЬ — лазер, разлёт камня, удар о корпус
+static const Note S_TUN_EXPL[] = { {400, 40}, {250, 50}, {140, 90} };
+static const Note S_TUN_HIT[]  = { {160, 60}, {0, 20}, {110, 140} };
+static const Note S_TUN_STEP[] = { {500, 10} };
+static const SfxOverride B_TUNNEL[] = {
+  SFX_SLIDE(Shoot, 2800, 900, 90),
+  SFX_MEL(Explode, S_TUN_EXPL),
+  SFX_MEL(Error, S_TUN_HIT),
+  SFX_MEL(Click, S_TUN_STEP),
+};
+
+// ДУМ — дробовик, рык, укус, лопнувший демон
+static const Note S_DOOM_HURT[] = { {90, 60}, {70, 80} };
+static const Note S_DOOM_DIE[]  = { {320, 40}, {180, 60}, {90, 120} };
+static const Note S_DOOM_BITE[] = { {200, 50}, {0, 30}, {150, 120} };
+static const Note S_DOOM_WAVE[] = { {165, 120}, {196, 120}, {220, 200} };
+static const SfxOverride B_DOOM[] = {
+  SFX_SLIDE(Shoot, 700, 120, 110),
+  SFX_MEL(Hit, S_DOOM_HURT),
+  SFX_MEL(Explode, S_DOOM_DIE),
+  SFX_MEL(Error, S_DOOM_BITE),
+  SFX_MEL(LevelUp, S_DOOM_WAVE),
+};
+
 const SfxBank SND_SHOOTER  = makeBank(B_SHOOTER);
 const SfxBank SND_PONG     = makeBank(B_PONG);
 const SfxBank SND_DUEL     = makeBank(B_DUEL);
@@ -401,3 +469,7 @@ const SfxBank SND_CATCH    = makeBank(B_CATCH);
 const SfxBank SND_PONG2D   = makeBank(B_PONG2D);
 const SfxBank SND_COLORS   = makeBank(B_COLORS);
 const SfxBank SND_DINO     = makeBank(B_DINO);
+const SfxBank SND_RACE     = makeBank(B_RACE);
+const SfxBank SND_MAZE     = makeBank(B_MAZE);
+const SfxBank SND_TUNNEL   = makeBank(B_TUNNEL);
+const SfxBank SND_DOOM     = makeBank(B_DOOM);
