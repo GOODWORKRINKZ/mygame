@@ -38,16 +38,62 @@ void DinoGame::reset() {
   lastLane = -1;
 }
 
-// Новый ряд препятствий: одна или две клетки, никогда все четыре,
-// и не в той же колонке два раза подряд, чтобы было куда убегать.
+// В каких полосах дино может оказаться к моменту нового ряда.
+// Идём от дино вверх по уже стоящим рядам: между соседними рядами он
+// успевает сдвинуться не больше чем на одну полосу, а полосы с
+// препятствиями из набора выпадают. Возвращает битовую маску полос.
+uint8_t DinoGame::reachableLanes() const {
+  // ряды сверху вниз по y: ближайший к дино — последним в проходе снизу
+  struct Row { float y; uint8_t mask; };
+  Row rows[MAX_OBS];
+  int nr = 0;
+  for (auto& o : obs) {
+    if (!o.active || o.judged) continue;
+    int k = -1;
+    for (int i = 0; i < nr; i++) if (fabsf(rows[i].y - o.y) < 0.4f) { k = i; break; }
+    if (k < 0) { rows[nr].y = o.y; rows[nr].mask = 0; k = nr++; }
+    rows[k].mask |= (uint8_t)(1 << o.col);
+  }
+  // сортировка по убыванию y (ближние к дино первыми)
+  for (int i = 1; i < nr; i++)
+    for (int j = i; j > 0 && rows[j].y > rows[j - 1].y; j--) { Row t = rows[j]; rows[j] = rows[j - 1]; rows[j - 1] = t; }
+
+  uint8_t reach = (uint8_t)(1 << lane);
+  for (int i = 0; i < nr; i++) {
+    uint8_t grown = (uint8_t)((reach | (reach << 1) | (reach >> 1)) & 0x0F);
+    reach = (uint8_t)(grown & ~rows[i].mask);
+    if (!reach) return 0;                   // уже тупик — пусть хоть новый ряд не добавит
+  }
+  // к новому ряду — ещё один шаг
+  return (uint8_t)((reach | (reach << 1) | (reach >> 1)) & 0x0F);
+}
+
+// Новый ряд препятствий: одна или две клетки, никогда все четыре, и
+// обязательно так, чтобы у дино осталась достижимая свободная полоса.
 void DinoGame::spawnRow() {
+  uint8_t reach = reachableLanes();
+  if (reach == 0) reach = 0x0F;              // тупик уже есть — не усугубляем логикой, просто не блокируем всё
+
   int n = (score >= 6 && random(100) < 35) ? 2 : 1;
-  int c1 = (int)random(0, N);
-  if (c1 == lastLane && random(2)) c1 = (c1 + 1) % N;
-  int c2 = -1;
-  if (n == 2) {
-    c2 = (int)random(0, N);
-    if (c2 == c1) c2 = (c1 + 2) % N;
+  int c1 = -1, c2 = -1;
+  for (int tries = 0; tries < 12; tries++) {
+    c1 = (int)random(0, N);
+    if (c1 == lastLane && random(2)) c1 = (c1 + 1) % N;
+    c2 = -1;
+    if (n == 2) {
+      c2 = (int)random(0, N);
+      if (c2 == c1) c2 = (c1 + 2) % N;
+    }
+    uint8_t blocked = (uint8_t)((1 << c1) | (c2 >= 0 ? (1 << c2) : 0));
+    if (reach & ~blocked) break;             // остаётся достижимая свободная полоса
+    if (tries >= 6) n = 1;                   // не выходит с двумя — ставим одно
+    c1 = -1;
+  }
+  if (c1 < 0) {
+    // крайний случай: одна клетка в любой недостижимой полосе, иначе пропускаем ряд
+    for (int c = 0; c < N; c++) if (!(reach & (1 << c))) { c1 = c; break; }
+    if (c1 < 0) return;
+    c2 = -1;
   }
   lastLane = c1;
   for (auto& o : obs) {
@@ -91,8 +137,8 @@ void DinoGame::update(const Inputs& in, Ctx& c) {
   spawnIn -= speed * c.dt;
   if (spawnIn <= 0) {
     spawnRow();
-    float gapRows = 1.9f - score * 0.02f;
-    if (gapRows < 1.25f) gapRows = 1.25f;
+    float gapRows = 2.0f - score * 0.02f;
+    if (gapRows < DINO_GAP_MIN_ROWS) gapRows = DINO_GAP_MIN_ROWS;
     spawnIn = gapRows * ((float)random(85, 120) / 100.0f);
   }
 
@@ -179,7 +225,9 @@ static const int CX        = 64;
 
 // Экранная X полосы lane (0..3, дробная) на глубине t: 0 = горизонт, 1 = у нас.
 static inline int laneScreenX(float lane, float t) {
-  float spread = 5.0f + 43.0f * t;                 // расстояние между полосами
+  // у низа экрана полосы через 30 px: 4 полосы + спрайт 16 px влезают в 128,
+  // края дороги (полосы -0.5 и 3.5) — на x=4 и x=124
+  float spread = 5.0f + 25.0f * t;
   return (int)(CX + (lane - 1.5f) * spread + 0.5f);
 }
 static inline int depthScreenY(float t) {

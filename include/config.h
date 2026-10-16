@@ -139,7 +139,8 @@
 #define DINO_LIVES          3
 #define DINO_SPEED_START    2.0f   // рядов в секунду
 #define DINO_SPEED_UP       0.05f  // прибавка за обойдённое препятствие
-#define DINO_SPEED_MAX      6.0f
+#define DINO_SPEED_MAX      4.5f   // быстрее человек между рядами не успевает
+#define DINO_GAP_MIN_ROWS   1.5f   // минимум клеток между рядами препятствий
 
 // --- PONG 2D (понг на матрице, 2 игрока) ---
 // Мяч ходит шагами по клеткам: на 4x4 плавное движение не читается.

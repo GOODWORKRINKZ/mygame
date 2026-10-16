@@ -579,6 +579,7 @@ private:
   uint32_t overUntil = 0;
   uint32_t hurtUntil = 0;
 
+  uint8_t reachableLanes() const;
   void spawnRow();
   void render(Ctx& c);
   void oled(Ctx& c);
