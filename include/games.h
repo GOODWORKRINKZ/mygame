@@ -530,6 +530,62 @@ private:
 };
 
 // ============================================================
+//  7d) DINO — динозаврик в пустыне (1 игрок, матрица 4x4 + 3D на OLED)
+//      Вид сверху на ленте, вид сзади с перспективой на экране.
+// ============================================================
+class DinoGame : public Game {
+public:
+  const char* name() const override { return "ДИНО"; }
+  const char* hint() const override { return "ОБЕГАЙ ПРЕПЯТСТВИЯ"; }
+  uint8_t players() const override { return 1; }
+  Color theme() const override { return rgb(255, 140, 0); }
+  const MusicTrack* music() const override { return &MUSIC_DINO; }
+  const SfxBank* sounds() const override { return &SND_DINO; }
+  bool  fullCanvas() const override { return true; }
+  RuleText rules() const override {
+    static const char* L[] = {
+      "1 ИГРОК",
+      "ДИНО БЕЖИТ ПО ПУСТЫНЕ",
+      "НА ЛЕНТЕ - ВИД СВЕРХУ",
+      "ТЫ - ТОЧКА ВНИЗУ",
+      "ЗЕЛЕНАЯ = ВПРАВО",
+      "СИНЯЯ = ВЛЕВО",
+      "ОБЕГАЙ КАМНИ",
+      "И КАКТУСЫ",
+      "НА ЭКРАНЕ - ВИД СЗАДИ",
+      "3 ЖИЗНИ",
+    };
+    return { L, (uint8_t)(sizeof(L) / sizeof(L[0])) };
+  }
+  void reset() override;
+  void update(const Inputs& in, Ctx& c) override;
+
+private:
+  struct Obst { float y = 0; uint8_t col = 0; uint8_t kind = 0; bool active = false; bool judged = false; };
+  static const int MAX_OBS = 8;
+
+  Obst     obs[MAX_OBS];
+  int      lane = 1;               // полоса дино 0..3
+  float    laneX = 1.0f;           // плавная позиция на экране
+  float    speed = DINO_SPEED_START;
+  float    spawnIn = 1.0f;         // в клетках пути до следующего ряда
+  float    dist = 0;               // пройдено клеток — для анимации
+  int      lives = DINO_LIVES;
+  int      score = 0;
+  int      best = 0;
+  int      lastLane = -1;
+  bool     newRecord = false;
+  bool     over = false;
+  uint32_t overUntil = 0;
+  uint32_t hurtUntil = 0;
+
+  uint8_t reachableLanes() const;
+  void spawnRow();
+  void render(Ctx& c);
+  void oled(Ctx& c);
+};
+
+// ============================================================
 //  8) SIMON — повтори последовательность (1 игрок)
 //     Лента показывает серию вспышек: зелёная (левая половина) или
 //     синяя (правая). Повторяй кнопками в том же порядке.
@@ -1224,7 +1280,7 @@ private:
 // ============================================================
 class GameManager {
 public:
-  static const int COUNT = 24;
+  static const int COUNT = 25;
 
   GameManager();
 
@@ -1253,6 +1309,7 @@ private:
   SniperGame   _sniper;
   CatchGame    _catch;
   ColorsGame   _colors;
+  DinoGame     _dino;
   SimonGame    _simon;
   RunnerGame   _runner;
   DefenderGame _defender;
