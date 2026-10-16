@@ -142,6 +142,28 @@
 #define DINO_SPEED_MAX      4.5f   // быстрее человек между рядами не успевает
 #define DINO_GAP_MIN_ROWS   1.5f   // минимум клеток между рядами препятствий
 
+// --- RACE (ГОНКА, 2 игрока, матрица 4x4 + 3D сплит-экран) ---
+#define RACE_LIVES          3
+#define RACE_SPEED_START    2.0f
+#define RACE_SPEED_UP       0.03f
+#define RACE_SPEED_MAX      4.5f
+#define RACE_GAP_MIN_ROWS   1.6f
+
+// --- MAZE (ЛАБИРИНТ, 1 игрок, рейкастинг на OLED) ---
+#define MAZE_CELLS          8      // клеток по стороне (сетка блоков 17x17)
+#define MAZE_CRYSTALS       5
+#define MAZE_TIME_MS        90000
+#define MAZE_HOLD_MS        250    // дольше — шаг вперёд, короче — поворот
+
+// --- TUNNEL (ТУННЕЛЬ, 1 игрок, вид из кабины) ---
+#define TUNNEL_LIVES          3
+#define TUNNEL_SPEED_START    2.0f
+#define TUNNEL_SPEED_UP       0.04f
+#define TUNNEL_SPEED_MAX      4.5f
+#define TUNNEL_GAP_MIN_ROWS   1.5f
+#define TUNNEL_SHOT_SPEED     14.0f  // рядов в секунду
+#define TUNNEL_FIRE_WINDOW_MS 80     // обе кнопки в этом окне = выстрел
+
 // --- PONG 2D (понг на матрице, 2 игрока) ---
 // Мяч ходит шагами по клеткам: на 4x4 плавное движение не читается.
 #define PONG2D_STEP_START   420    // мс на одну клетку при подаче

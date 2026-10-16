@@ -38,6 +38,9 @@ extern const MusicTrack MUSIC_CATCH;
 extern const MusicTrack MUSIC_PONG2D;
 extern const MusicTrack MUSIC_COLORS;
 extern const MusicTrack MUSIC_DINO;
+extern const MusicTrack MUSIC_RACE;
+extern const MusicTrack MUSIC_MAZE;
+extern const MusicTrack MUSIC_TUNNEL;
 
 // ---- банки эффектов ----
 extern const SfxBank SND_SHOOTER;
@@ -59,3 +62,6 @@ extern const SfxBank SND_CATCH;
 extern const SfxBank SND_PONG2D;
 extern const SfxBank SND_COLORS;
 extern const SfxBank SND_DINO;
+extern const SfxBank SND_RACE;
+extern const SfxBank SND_MAZE;
+extern const SfxBank SND_TUNNEL;
