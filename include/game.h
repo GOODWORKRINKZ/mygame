@@ -14,6 +14,9 @@ struct BtnState {
   bool     held     = false;   // удерживается прямо сейчас
   uint32_t heldMs   = 0;       // сколько удерживается
   uint32_t lastHeldMs = 0;     // длительность последнего завершённого нажатия
+  // millis() самого фронта нажатия (а не начала кадра). Нужно играм на
+  // реакцию: кто нажал раньше внутри одного кадра, и точное время реакции.
+  uint32_t pressedAt = 0;
 };
 
 struct Inputs {
@@ -64,6 +67,10 @@ public:
   virtual bool    coop() const { return false; }
   virtual Color   theme() const { return rgb(180, 180, 180); }  // цвет в меню
   virtual RuleText rules() const { return RuleText(); }  // экран "как играть"
+  // Полный холст: игре нужна вся физическая лента (рукава, кольцо,
+  // сердцевина матрицы — см. canvas.h), стен у неё нет. Одномерные
+  // игры оставляют false и видят привычную логическую линию с рамкой.
+  virtual bool    fullCanvas() const { return false; }
 
   virtual void reset() = 0;
   virtual void update(const Inputs& in, Ctx& c) = 0;

@@ -104,8 +104,11 @@ void TowerGame::render(Ctx& c) {
   LedStrip& L = c.leds;
   L.clear();
 
-  // предыдущий этаж — тусклая "площадка", по ней и целимся
-  for (int i = prevLo; i <= prevHi; i++) L.set(i, rgb(24, 24, 30));
+  // предыдущий этаж — серая "площадка", по ней и целимся.
+  // Края площадки светлее: видно, куда именно надо попасть.
+  for (int i = prevLo; i <= prevHi; i++) L.set(i, rgb(34, 34, 44));
+  L.set(prevLo, rgb(80, 80, 100));
+  L.set(prevHi, rgb(80, 80, 100));
 
   // текущий блок, цвет меняется с высотой
   int lo = (int)(pos + 0.5f);

@@ -16,6 +16,7 @@ struct Particle {
   float drag;     // торможение
   Color color;
   bool  active;
+  const Path* path;   // по какому пути летит (nullptr = логическая линия)
 };
 
 class Fx {
@@ -24,12 +25,16 @@ public:
 
   void reset();
 
-  // Одна искра.
-  void spark(float pos, float vel, Color c, float lifeSec = 0.5f);
+  // Одна искра. path — по какому виртуальному дисплею она летит;
+  // nullptr = логическая линия, как у всех одномерных игр.
+  void spark(float pos, float vel, Color c, float lifeSec = 0.5f,
+             const Path* path = nullptr);
   // Круговой "взрыв": n искр в обе стороны.
-  void burst(float pos, Color c, uint8_t n = 8, float speed = 14.0f);
+  void burst(float pos, Color c, uint8_t n = 8, float speed = 14.0f,
+             const Path* path = nullptr);
   // Направленный шлейф (например, из дула).
-  void jet(float pos, int dir, Color c, uint8_t n = 4, float speed = 10.0f);
+  void jet(float pos, int dir, Color c, uint8_t n = 4, float speed = 10.0f,
+           const Path* path = nullptr);
 
   // Полноэкранная вспышка, гаснет за durMs.
   void flash(Color c, uint16_t durMs = 180);

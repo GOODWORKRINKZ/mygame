@@ -21,7 +21,7 @@ Particle* Fx::freeSlot() {
   return weakest;
 }
 
-void Fx::spark(float pos, float vel, Color c, float lifeSec) {
+void Fx::spark(float pos, float vel, Color c, float lifeSec, const Path* path) {
   Particle* p = freeSlot();
   p->pos = pos;
   p->vel = vel;
@@ -29,21 +29,22 @@ void Fx::spark(float pos, float vel, Color c, float lifeSec) {
   p->decay = lifeSec > 0.01f ? (1.0f / lifeSec) : 4.0f;
   p->drag = 1.6f;
   p->color = c;
+  p->path = path;
   p->active = true;
 }
 
-void Fx::burst(float pos, Color c, uint8_t n, float speed) {
+void Fx::burst(float pos, Color c, uint8_t n, float speed, const Path* path) {
   for (uint8_t i = 0; i < n; i++) {
     float k = ((float)random(30, 130)) / 100.0f;     // разброс скоростей
     float v = speed * k * ((i & 1) ? 1.0f : -1.0f);
-    spark(pos, v, c, 0.35f + (float)random(0, 40) / 100.0f);
+    spark(pos, v, c, 0.35f + (float)random(0, 40) / 100.0f, path);
   }
 }
 
-void Fx::jet(float pos, int dir, Color c, uint8_t n, float speed) {
+void Fx::jet(float pos, int dir, Color c, uint8_t n, float speed, const Path* path) {
   for (uint8_t i = 0; i < n; i++) {
     float k = ((float)random(40, 120)) / 100.0f;
-    spark(pos, speed * k * (dir >= 0 ? 1.0f : -1.0f), c, 0.25f);
+    spark(pos, speed * k * (dir >= 0 ? 1.0f : -1.0f), c, 0.25f, path);
   }
 }
 
@@ -69,7 +70,14 @@ void Fx::update(float dt) {
     p.pos += p.vel * dt;
     p.vel -= p.vel * p.drag * dt;
     p.life -= p.decay * dt;
-    if (p.life <= 0.0f || p.pos < -1.5f || p.pos > LED_COUNT + 0.5f) p.active = false;
+    if (p.life <= 0.0f) { p.active = false; continue; }
+    if (p.path) {
+      // на кольце искра просто идёт по кругу, на отрезке — вылетает за край
+      if (p.path->loop) p.pos = p.path->wrap(p.pos);
+      else if (p.pos < -1.5f || p.pos > p.path->len + 0.5f) p.active = false;
+    } else if (p.pos < -1.5f || p.pos > LED_COUNT + 0.5f) {
+      p.active = false;
+    }
   }
   if (_shockDur) _shockR += _shockSpeed * dt;
 }
@@ -81,7 +89,8 @@ void Fx::draw(LedStrip& leds) {
     Particle& p = _p[i];
     if (!p.active) continue;
     uint8_t b = (uint8_t)(p.life * 255.0f);
-    leds.addAA(p.pos, colScale(p.color, b));
+    if (p.path) leds.addAA(*p.path, p.pos, colScale(p.color, b));
+    else        leds.addAA(p.pos, colScale(p.color, b));
   }
 
   if (_shockDur) {

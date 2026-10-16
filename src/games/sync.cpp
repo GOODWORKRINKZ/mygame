@@ -105,7 +105,7 @@ void SyncGame::update(const Inputs& in, Ctx& c) {
       for (int p = 0; p < 2; p++) {
         if (fired[p] || !btn[p]->pressed) continue;
         fired[p] = true;
-        err[p] = (int)((int32_t)c.now - (int32_t)meetAt);
+        err[p] = (int)((int32_t)btn[p]->pressedAt - (int32_t)meetAt);
         c.out.tone(p == 0 ? 900 : 1200, 25);
       }
       // решаем, когда оба нажали или когда терпеть уже нечего
@@ -193,7 +193,7 @@ void SyncGame::oled(Ctx& c) {
   }
 
   snprintf(right, sizeof right, "У%d", level);
-  snprintf(foot, sizeof foot, "ОКНО %dмс  ЖИЗНИ %d", tol, lives);
+  snprintf(foot, sizeof foot, "ОКНО %dМС  ЖИЗНИ %d", tol, lives);
 
   Panel l, r;
   l.name = "СИНИЙ";   l.big = b2; l.sub = s2; l.active = fired[1];

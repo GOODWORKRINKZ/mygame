@@ -6,6 +6,7 @@
 #include <Adafruit_SSD1306.h>
 #include "config.h"
 #include "led_map.h"
+#include "canvas.h"
 #include "log.h"
 
 // ============================================================
@@ -42,37 +43,75 @@ uint8_t tri8(uint8_t theta);
 #define COL_NEUTRAL   rgb(40, 40, 46)
 
 // ============================================================
-//  Лента: логический кадровый буфер поверх физической ленты
+//  Лента: кадровый буфер поверх физической ленты
 // ============================================================
-//  Игры работают только с логическими индексами 0..LED_COUNT-1.
-//  При выводе кадра каждый логический пиксель уходит на свой
-//  физический адрес из LED_LOGICAL_MAP, а физические светодиоды,
-//  которых в таблице нет, заливаются цветом стен.
+//  Кадр хранится по ФИЗИЧЕСКИМ номерам, а наружу торчат три
+//  системы координат:
+//    * логическая линия 0..LED_COUNT-1 (set/add/addAA/fill) — так
+//      работают все одномерные игры, как и раньше;
+//    * пути (Path/Route из canvas.h) — рукава, кольцо, маршруты;
+//    * сетка (setXY/addXY/addAAXY) — матрица как картинка.
+//  Все три рисуют в один и тот же кадр и могут пересекаться.
+//
+//  Стены. В обычном режиме физические светодиоды, которых нет в
+//  логической линии, при clear()/fade() заливаются цветом стен, и
+//  одномерная игра видит привычную рамку. Игра, которой нужна вся
+//  лента (fullCanvas() == true), стен не получает: после clear()
+//  у неё все LED_PHYSICAL_COUNT светодиодов чёрные и свои.
 // ============================================================
 class LedStrip {
 public:
   void begin();
 
-  // ---- работа с кадром ----
-  void clear();                       // погасить буфер
-  void fade(uint8_t keep);            // умножить весь кадр на keep/255 (хвосты)
+  // ---- кадр целиком ----
+  void clear();                       // погасить (в обычном режиме стены остаются)
+  void fade(uint8_t keep);            // умножить кадр на keep/255 (хвосты)
   void show();                        // гамма + вывод на ленту
-
-  void set(int logical, Color c);     // записать поверх
-  void add(int logical, Color c);     // сложить (аддитивное смешивание)
-  void addAA(float pos, Color c);     // субпиксельная точка со сглаживанием
-  void fill(int from, int to, Color c);
-  void fillAll(Color c);
+  void fillAll(Color c);              // всё игровое поле
   void addAll(Color c);
 
+  // ---- логическая линия (как раньше) ----
+  void set(int logical, Color c);
+  void add(int logical, Color c);
+  void addAA(float pos, Color c);     // субпиксельная точка со сглаживанием
+  void fill(int from, int to, Color c);
   Color get(int logical) const;
 
-  // ---- карта ----
+  // ---- физические светодиоды ----
+  void  setP(int physical, Color c);
+  void  addP(int physical, Color c);
+  Color getP(int physical) const;
+
+  // ---- пути и маршруты ----
+  void set(const Path& p, int i, Color c)      { setP(p.phys(i), c); }
+  void add(const Path& p, int i, Color c)      { addP(p.phys(i), c); }
+  void addAA(const Path& p, float pos, Color c);
+  void fill(const Path& p, Color c);
+  void fade(const Path& p, uint8_t keep);
+  void addAA(const Route& r, float pos, Color c);
+  void fill(const Route& r, Color c);
+
+  // ---- сетка ----
+  static int gridPhys(int col, int row) {
+    if (col < 0 || col >= LED_GRID_COLS || row < 0 || row >= LED_GRID_ROWS) return -1;
+    uint8_t p = LED_GRID[row][col];
+    return p == LED_NONE ? -1 : p;
+  }
+  void  setXY(int col, int row, Color c)  { setP(gridPhys(col, row), c); }
+  void  addXY(int col, int row, Color c)  { addP(gridPhys(col, row), c); }
+  Color getXY(int col, int row) const      { return getP(gridPhys(col, row)); }
+  void  addAAXY(float x, float y, Color c);        // билинейная точка на сетке
+  void  fillRect(int col, int row, int w, int h, Color c);
+
+  // ---- карта и режим ----
   uint8_t physicalOf(int logical) const;        // логический -> физический
-  bool    isWall(int physical) const;           // этот физический вне игры?
-  void    setWall(Color c) { _wall = c; }       // перекрасить стены
+  bool    isWall(int physical) const;           // физический вне логической линии?
+  void    setWall(Color c);                     // перекрасить стены
   Color   wall() const { return _wall; }
   void    resetWall();                          // вернуть цвет из led_map.h
+  // Полный холст: стен нет, игре принадлежат все физические светодиоды.
+  void    setFullCanvas(bool on);
+  bool    fullCanvas() const { return _full; }
 
   // Совместимость со старым кодом
   Color rgb(uint8_t r, uint8_t g, uint8_t b) const { return ::rgb(r, g, b); }
@@ -86,11 +125,13 @@ public:
 private:
   static const uint8_t NO_LOGICAL = 0xFF;
 
+  void paintWalls();                      // залить стены их цветом (обычный режим)
   void rawPixel(int physical, Color c);   // напрямую в ленту, мимо карты
   void rawFill(Color c);
 
-  Color   _buf[LED_COUNT];                     // логический кадр
+  Color   _buf[LED_PHYSICAL_COUNT];            // физический кадр
   Color   _wall = 0;                           // цвет стен
+  bool    _full = false;                       // полный холст (без стен)
   uint8_t _phys2log[LED_PHYSICAL_COUNT];       // физический -> логический (или NO_LOGICAL)
   Adafruit_NeoPixel _strip{LED_PHYSICAL_COUNT, PIN_LED, NEO_GRB + NEO_KHZ800};
 };
@@ -105,8 +146,16 @@ public:
   Adafruit_SSD1306& gfx() { return _oled; }
 
   void clear();
-  void flush();        // вывод кадра не чаще OLED_MIN_MS
-  void flushNow();     // вывод немедленно (заставки, смена экрана)
+  // Поставить кадр в очередь на вывод (не чаще OLED_MIN_MS). Сама передача
+  // по I2C идёт кусками в pump(), чтобы не замораживать опрос кнопок:
+  // целый кадр 1 КиБ на 400 кГц — это ~25 мс, за которые можно
+  // прозевать короткое нажатие.
+  void flush();
+  // Один кусок передачи (~3 мс). Звать в каждом проходе loop().
+  void pump();
+  // Вывод немедленно и целиком (заставки, экраны диагностики).
+  void flushNow();
+  bool busy() const { return _txLeft > 0; }
 
   void text(int x, int y, const char* s, uint8_t size = 1);
   void textCentered(int y, const char* s, uint8_t size = 1);
@@ -117,9 +166,19 @@ public:
   bool ok() const { return _ok; }
 
 private:
+  static const uint16_t FRAME_BYTES = OLED_WIDTH * OLED_HEIGHT / 8;
+  static const uint8_t  CHUNK = 127;        // байт данных в одной I2C-транзакции
+
   Adafruit_SSD1306 _oled{OLED_WIDTH, OLED_HEIGHT, &Wire, -1};
   uint32_t _lastFlush = 0;
-  bool _ok = false;
+  bool     _ok = false;
+  uint8_t  _addr = OLED_ADDR;
+
+  // Копия кадра на время передачи: игра тем временем рисует следующий.
+  uint8_t  _tx[FRAME_BYTES];
+  uint16_t _txPos = 0;
+  uint16_t _txLeft = 0;
+  bool     _txHeaderSent = false;
 };
 
 // ============================================================
@@ -186,14 +245,19 @@ public:
   void begin(uint8_t pin);
   void update();
 
-  bool pressed()  const { return _pressed; }    // фронт "нажали"
+  bool pressed()  const { return _pressed; }    // фронт "нажали" (один вызов update)
   bool released() const { return _released; }   // фронт "отпустили"
   bool held()     const { return _raw; }        // удерживается прямо сейчас
+  bool rawLow()   const { return _lastDebounceRaw; } // сырой уровень на ноге (без антидребезга)
   uint32_t heldMs() const;                      // сколько удерживается, мс
+  uint32_t pressedAt() const { return _pressStart; } // когда началось текущее/последнее нажатие
   uint32_t lastHeldMs() const { return _lastHeld; } // длительность последнего нажатия
   bool longPress();                             // один раз после BTN_LONG_MS
-  // Автоповтор при удержании — для навигации по меню.
-  bool repeat(uint16_t firstMs = 450, uint16_t rateMs = 130);
+  // Автоповтор при удержании — для навигации по меню. pressedNow — фронт
+  // нажатия ЭТОГО кадра (защёлкнутый в main), иначе повтор не стартует.
+  bool repeat(bool pressedNow, uint16_t firstMs = 450, uint16_t rateMs = 130);
+
+  uint8_t pin() const { return _pin; }
 
 private:
   uint8_t  _pin = 0;
@@ -203,6 +267,7 @@ private:
   bool     _released = false;
   bool     _longFired = false;
   bool     _longFlag = false;
+  bool     _stuckWarned = false;
   uint32_t _lastDebounceTime = 0;
   uint32_t _pressStart = 0;
   uint32_t _lastHeld = 0;

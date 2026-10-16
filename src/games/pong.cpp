@@ -78,7 +78,8 @@ void PongGame::update(const Inputs& in, Ctx& c) {
   // ---- шпингалеты ----
   for (int p = 0; p < 2; p++) {
     PaddlePhase before = pad[p].phase;
-    pad[p].update(c.dt, btn[p]->held, btn[p]->released);
+    // held || pressed: короткий тап между кадрами тоже должен дёрнуть шпингалет
+    pad[p].update(c.dt, btn[p]->held || btn[p]->pressed, btn[p]->released);
 
     // звук: каждый накопленный пиксель энергии — на полтона выше
     if (pad[p].phase == PaddlePhase::Charging) {
