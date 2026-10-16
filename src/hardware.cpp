@@ -527,13 +527,13 @@ void Output::begin() {
   LOG_I("OUT", "buzzer pin=%d, vibro pin=%d", PIN_BUZZER, PIN_VIBRO);
 }
 
-void Output::writeTone(uint16_t freq) {
+void Output::writeTone(uint16_t freq, uint8_t duty) {
 #if SOUND_ENABLED
   if (freq == 0) { BUZZ_DUTY(0); return; }
   BUZZ_TONE(freq);
-  BUZZ_DUTY(BUZZER_DUTY);
+  BUZZ_DUTY(duty);
 #else
-  (void)freq;
+  (void)freq; (void)duty;
 #endif
 }
 
@@ -541,7 +541,73 @@ void Output::silence() {
   _melody = nullptr;
   _sliding = false;
   _toneEnd = 0;
+  _musicNote = -1;                  // музыка перезвучит свою ноту на следующем шаге
   BUZZ_DUTY(0);
+}
+
+// ---- музыка ----
+
+void Output::music(const MusicTrack* track, bool loop) {
+#if !MUSIC_ENABLED
+  track = nullptr;
+#endif
+  if (track && (!track->notes || track->count == 0)) track = nullptr;
+  _track = track;
+  _musicLoop = loop;
+  _musicPos = 0;
+  _musicTempo = 1.0f;
+  _musicLast = millis();
+  _musicNote = -1;
+  _musicGap = false;
+  if (!track && !effectActive()) BUZZ_DUTY(0);
+}
+
+void Output::musicTempo(float mul) {
+  if (mul < 0.25f) mul = 0.25f;
+  if (mul > 4.0f)  mul = 4.0f;
+  _musicTempo = mul;
+}
+
+// Позиция в теме идёт всегда, звук — только когда бузер свободен от эффектов.
+void Output::musicUpdate(uint32_t now) {
+  if (!_track) return;
+  uint32_t dt = now - _musicLast;
+  _musicLast = now;
+  _musicPos += (float)dt * _musicTempo;
+
+  // длина темы и нота под текущей позицией
+  float total = 0;
+  for (uint8_t i = 0; i < _track->count; i++) total += _track->notes[i].durMs;
+  if (total <= 0) return;
+  if (_musicPos >= total) {
+    if (!_musicLoop) {                       // мотив отыгран — замолкаем
+      _track = nullptr;
+      _musicNote = -1;
+      if (!effectActive()) BUZZ_DUTY(0);
+      return;
+    }
+    while (_musicPos >= total) _musicPos -= total;
+  }
+
+  float acc = 0;
+  int idx = 0;
+  for (uint8_t i = 0; i < _track->count; i++) {
+    if (_musicPos < acc + _track->notes[i].durMs) { idx = i; break; }
+    acc += _track->notes[i].durMs;
+  }
+  const Note& n = _track->notes[idx];
+  // короткая пауза в конце ноты — иначе две одинаковые сливаются в одну
+  float gap = n.durMs > 4 * MUSIC_GAP_MS ? (float)MUSIC_GAP_MS : n.durMs / 4.0f;
+  bool inGap = (_musicPos - acc) >= (n.durMs - gap);
+
+  if (effectActive()) { _musicNote = -1; return; }   // бузер занят эффектом
+
+  if (idx != _musicNote || inGap != _musicGap) {
+    _musicNote = idx;
+    _musicGap = inGap;
+    if (inGap || n.freq == 0) BUZZ_DUTY(0);
+    else                      writeTone(n.freq, MUSIC_DUTY);
+  }
 }
 
 void Output::update() {
@@ -572,6 +638,8 @@ void Output::update() {
     BUZZ_DUTY(0);
     _toneEnd = 0;
   }
+
+  musicUpdate(now);
 
   // Вибромотор: цепочка импульсов, полностью неблокирующая.
   if (_vibroLeft || _vibroState) {
@@ -628,25 +696,52 @@ void Output::buzzPattern(uint8_t pulses, uint16_t onMs, uint16_t offMs) {
 }
 
 void Output::sfx(Sfx id) {
+  // ---- вибрация: общая для всех банков ----
+  switch (id) {
+    case Sfx::Error:        buzz(180); break;
+    case Sfx::ShootCharged: buzz(40); break;
+    case Sfx::Hit:          buzz(150); break;
+    case Sfx::Explode:      buzzPattern(2, 70, 50); break;
+    case Sfx::Twang:        buzz(35); break;
+    case Sfx::LevelUp:      buzz(90); break;
+    case Sfx::Win:          buzzPattern(2, 110, 80); break;
+    case Sfx::Lose:         buzz(220); break;
+    case Sfx::Fanfare:      buzzPattern(2, 90, 90); break;
+    case Sfx::GameOver:     buzzPattern(3, 90, 70); break;
+    default: break;
+  }
+
+  // ---- банк текущей игры: свой звук вместо стандартного ----
+  if (_bank) {
+    for (uint8_t i = 0; i < _bank->count; i++) {
+      const SfxOverride& o = _bank->items[i];
+      if (o.id != id) continue;
+      if (o.notes)        melody(o.notes, o.count);
+      else if (o.slideMs) slide(o.slideFrom, o.slideTo, o.slideMs);
+      return;
+    }
+  }
+
+  // ---- стандартный набор ----
   switch (id) {
     case Sfx::Click:        tone(988, 25); break;
     case Sfx::Beep:         tone(1319, 55); break;
     case Sfx::Select:       melody(SFX_SELECT, 2); break;
     case Sfx::Back:         melody(SFX_BACK, 2); break;
-    case Sfx::Error:        melody(SFX_ERROR, 3); buzz(180); break;
+    case Sfx::Error:        melody(SFX_ERROR, 3); break;
     case Sfx::Shoot:        slide(1900, 900, 70); break;
-    case Sfx::ShootCharged: slide(2400, 700, 150); buzz(40); break;
-    case Sfx::Hit:          tone(330, 90); buzz(150); break;
-    case Sfx::Explode:      melody(SFX_EXPLODE, 3); buzzPattern(2, 70, 50); break;
+    case Sfx::ShootCharged: slide(2400, 700, 150); break;
+    case Sfx::Hit:          tone(330, 90); break;
+    case Sfx::Explode:      melody(SFX_EXPLODE, 3); break;
     case Sfx::Bounce:       tone(1568, 35); break;
-    case Sfx::Twang:        slide(300, 1400, 110); buzz(35); break;
+    case Sfx::Twang:        slide(300, 1400, 110); break;
     case Sfx::Tick:         tone(2200, 14); break;
     case Sfx::Pickup:       melody(SFX_PICKUP, 2); break;
-    case Sfx::LevelUp:      melody(SFX_LEVELUP, 4); buzz(90); break;
-    case Sfx::Win:          melody(SFX_WIN, 4); buzzPattern(2, 110, 80); break;
-    case Sfx::Lose:         melody(SFX_LOSE, 3); buzz(220); break;
-    case Sfx::Fanfare:      melody(SFX_FANFARE, 6); buzzPattern(2, 90, 90); break;
-    case Sfx::GameOver:     melody(SFX_GAMEOVER, 4); buzzPattern(3, 90, 70); break;
+    case Sfx::LevelUp:      melody(SFX_LEVELUP, 4); break;
+    case Sfx::Win:          melody(SFX_WIN, 4); break;
+    case Sfx::Lose:         melody(SFX_LOSE, 3); break;
+    case Sfx::Fanfare:      melody(SFX_FANFARE, 6); break;
+    case Sfx::GameOver:     melody(SFX_GAMEOVER, 4); break;
     case Sfx::Countdown:    melody(SFX_COUNT, 7); break;
   }
 }
@@ -667,11 +762,17 @@ void Button::update() {
   if (nowRaw != _lastDebounceRaw) {
     _lastDebounceTime = now;
     _lastDebounceRaw = nowRaw;
+    if (_raw && !nowRaw) _glitches++;        // контакт разомкнулся во время удержания
   }
-  // Нажатие подтверждаем быстро, отпускание — дольше: пружинные
-  // аркадные кнопки дребезжат в основном на отпускании, а лишний
-  // "фронт" там выглядит как двойное нажатие или залипание.
-  uint32_t need = nowRaw ? BTN_PRESS_MS : BTN_RELEASE_MS;
+  // Нажатие подтверждаем быстро. Отпускание — дольше, и тем дольше, чем
+  // дольше держали: короткий тап при долбеже отпускается за BTN_RELEASE_MS,
+  // а долгое удержание (заряд, блок, полоска в ЖАДНОСТИ) не рвётся от
+  // случайного размыкания контакта короче BTN_RELEASE_HOLD_MS.
+  uint32_t need = BTN_PRESS_MS;
+  if (!nowRaw) {
+    bool longHold = _raw && (now - _pressStart) >= BTN_HOLD_MS;
+    need = longHold ? BTN_RELEASE_HOLD_MS : BTN_RELEASE_MS;
+  }
   bool stable = (now - _lastDebounceTime >= need) ? nowRaw : _raw;
 
   _pressed  = stable && !_raw;

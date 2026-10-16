@@ -189,6 +189,36 @@ struct Note {
   uint16_t durMs;
 };
 
+// Мотив для фонового канала: заставка игры, играет один раз при старте
+// (или по кругу, если попросить). Длительности нот — при темпе 1.0;
+// Output::musicTempo() растягивает или сжимает их на лету.
+struct MusicTrack {
+  const Note* notes;
+  uint8_t     count;
+};
+template <size_t N>
+constexpr MusicTrack makeTrack(const Note (&n)[N]) { return MusicTrack{ n, (uint8_t)N }; }
+
+// Переопределение одного эффекта: либо мелодия (notes != nullptr),
+// либо слайд частоты (slideMs != 0). Вибрация у эффекта остаётся общей.
+enum class Sfx : uint8_t;
+struct SfxOverride {
+  Sfx         id;
+  const Note* notes;
+  uint8_t     count;
+  uint16_t    slideFrom, slideTo, slideMs;
+};
+// Банк звуков игры: список переопределений. Чего в банке нет —
+// звучит по умолчанию. См. include/sound.h.
+struct SfxBank {
+  const SfxOverride* items;
+  uint8_t            count;
+};
+template <size_t N>
+constexpr SfxBank makeBank(const SfxOverride (&a)[N]) { return SfxBank{ a, (uint8_t)N }; }
+#define SFX_MEL(ID, ARR)           { Sfx::ID, ARR, (uint8_t)(sizeof(ARR) / sizeof(ARR[0])), 0, 0, 0 }
+#define SFX_SLIDE(ID, FROM, TO, MS) { Sfx::ID, nullptr, 0, FROM, TO, MS }
+
 // Каталог звуковых эффектов
 enum class Sfx : uint8_t {
   Click, Beep, Select, Back, Error,
@@ -205,7 +235,20 @@ public:
   void slide(uint16_t from, uint16_t to, uint16_t durMs);  // плавный "вжух"
   void melody(const Note* notes, uint8_t count);
   void sfx(Sfx id);
-  void silence();
+  void silence();                      // оборвать эффект (музыку не трогает)
+  // Банк звуков текущей игры: переопределяет часть эффектов sfx().
+  // nullptr — стандартный набор.
+  void setBank(const SfxBank* b) { _bank = b; }
+
+  // ---- фоновая музыка: второй логический канал на том же бузере ----
+  // Мотив играет (один раз или по кругу), пока не идёт эффект:
+  // tone/slide/melody/sfx перебивают его, а по окончании он продолжается
+  // с той ноты, которая должна звучать по времени (позиция идёт и во
+  // время эффекта).
+  void music(const MusicTrack* track, bool loop = false);  // nullptr = остановить
+  void musicTempo(float mul);           // 1.0 = как написано, 2.0 = вдвое быстрее
+  void musicStop() { music(nullptr); }
+  const MusicTrack* musicNow() const { return _track; }
 
   void buzz(uint16_t durMs);           // одиночный импульс вибрации
   void buzzPattern(uint8_t pulses, uint16_t onMs, uint16_t offMs);
@@ -218,7 +261,9 @@ public:
   void startupFanfare() { sfx(Sfx::Fanfare); }
 
 private:
-  void writeTone(uint16_t freq);
+  void writeTone(uint16_t freq, uint8_t duty = BUZZER_DUTY);
+  bool effectActive() const { return _sliding || _melody || _toneEnd; }
+  void musicUpdate(uint32_t now);
 
   uint32_t _toneEnd = 0;
   const Note* _melody = nullptr;
@@ -229,6 +274,17 @@ private:
   bool     _sliding = false;
   uint32_t _slideStart = 0, _slideDur = 0;
   uint16_t _slideFrom = 0, _slideTo = 0;
+
+  const SfxBank* _bank = nullptr;
+
+  // Музыка
+  const MusicTrack* _track = nullptr;
+  bool     _musicLoop = false;
+  float    _musicPos = 0;        // мс от начала темы (в "нотных" мс, до темпа)
+  float    _musicTempo = 1.0f;
+  uint32_t _musicLast = 0;       // millis() прошлого шага
+  int      _musicNote = -1;      // какая нота звучит сейчас (-1 = ничего/перебита)
+  bool     _musicGap = false;    // сейчас пауза между нотами
 
   // Вибро
   uint32_t _vibroNext = 0;
@@ -252,6 +308,10 @@ public:
   uint32_t heldMs() const;                      // сколько удерживается, мс
   uint32_t pressedAt() const { return _pressStart; } // когда началось текущее/последнее нажатие
   uint32_t lastHeldMs() const { return _lastHeld; } // длительность последнего нажатия
+  // Сколько раз контакт размыкался во время засчитанного удержания
+  // (дребезг/чаттер микрика). Для теста кнопок.
+  uint32_t holdGlitches() const { return _glitches; }
+  void     resetStats() { _glitches = 0; }
   bool longPress();                             // один раз после BTN_LONG_MS
   // Автоповтор при удержании — для навигации по меню. pressedNow — фронт
   // нажатия ЭТОГО кадра (защёлкнутый в main), иначе повтор не стартует.
@@ -268,6 +328,7 @@ private:
   bool     _longFired = false;
   bool     _longFlag = false;
   bool     _stuckWarned = false;
+  uint32_t _glitches = 0;
   uint32_t _lastDebounceTime = 0;
   uint32_t _pressStart = 0;
   uint32_t _lastHeld = 0;
